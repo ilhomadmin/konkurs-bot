@@ -14,19 +14,25 @@ from bot.db.database import init_db
 from bot.db.models import create_admin_role, get_admin_by_telegram_id
 from bot.config import ADMIN_IDS
 
-# Handler routerlarni import qilish
+# Handlerlar
+from bot.handlers.admin.direct_sale import router as direct_sale_router  # DS /start avval
 from bot.handlers.start import router as start_router
 from bot.handlers.language import router as language_router
 from bot.handlers.catalog import router as catalog_router
+from bot.handlers.cart import router as cart_router
+from bot.handlers.order import router as order_router
+from bot.handlers.payment import router as payment_router
+from bot.handlers.my_orders import router as my_orders_router
+from bot.handlers.faq import router as faq_router
 from bot.handlers.admin.menu import router as admin_menu_router
 from bot.handlers.admin.products import router as admin_products_router
 from bot.handlers.admin.accounts import router as admin_accounts_router
 from bot.handlers.admin.roles import router as admin_roles_router
+from bot.handlers.admin.orders import router as admin_orders_router
 
-# Schedulerni import qilish
+# Scheduler
 from bot.scheduler.tasks import setup_scheduler
 
-# Logging sozlash
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -36,11 +42,9 @@ logger = logging.getLogger(__name__)
 
 async def on_startup(bot: Bot) -> None:
     """Bot ishga tushganda bajariladigan amallar"""
-    # DB ni yaratish
     await init_db()
     logger.info("Ma'lumotlar bazasi tayyor.")
 
-    # Birinchi ADMIN_ID ni boss sifatida ro'yxatdan o'tkazish
     boss_id = ADMIN_IDS[0]
     existing = await get_admin_by_telegram_id(boss_id)
     if not existing:
@@ -59,21 +63,31 @@ async def main() -> None:
 
     dp = Dispatcher(storage=MemoryStorage())
 
-    # Routerlarni qo'shish (tartib muhim — spesifik handlerlar avval)
+    # Routerlar tartib muhim:
+    # 1. Direct sale deep link — /start DS_xxx (avval tekshiriladi)
+    dp.include_router(direct_sale_router)
+    # 2. Oddiy /start
     dp.include_router(start_router)
     dp.include_router(language_router)
+    # 3. Katalog, savat, buyurtma
     dp.include_router(catalog_router)
+    dp.include_router(cart_router)
+    dp.include_router(order_router)
+    dp.include_router(payment_router)
+    dp.include_router(my_orders_router)
+    dp.include_router(faq_router)
+    # 4. Admin handlerlar
     dp.include_router(admin_menu_router)
     dp.include_router(admin_products_router)
     dp.include_router(admin_accounts_router)
     dp.include_router(admin_roles_router)
+    dp.include_router(admin_orders_router)
 
-    # Schedulerni ishga tushirish
-    scheduler = setup_scheduler()
+    # Scheduler (bot instance bilan)
+    scheduler = setup_scheduler(bot)
     scheduler.start()
     logger.info("Scheduler ishga tushdi.")
 
-    # Bot ishga tushganda
     dp.startup.register(on_startup)
 
     try:

@@ -153,6 +153,7 @@ async def init_db() -> None:
                 payment_screenshot_file_id TEXT,
                 payment_verified_by INTEGER,
                 payment_verified_at TIMESTAMP,
+                progress_message_id INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id)

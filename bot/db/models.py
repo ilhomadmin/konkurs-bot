@@ -523,3 +523,636 @@ async def delete_admin_role(telegram_id: int) -> None:
             (telegram_id,)
         )
         await db.commit()
+
+
+# ==================== CART ITEMS ====================
+
+async def cart_get(user_id: int) -> list[dict]:
+    """Foydalanuvchi savatini qaytaradi (product ma'lumotlari bilan). user_id = telegram_id"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT ci.*, p.name_uz, p.name_ru, pp.price, pp.cost_price
+            FROM cart_items ci
+            JOIN users u ON u.id = ci.user_id
+            JOIN products p ON p.id = ci.product_id
+            JOIN product_prices pp ON pp.product_id = ci.product_id
+                AND pp.duration_tier = ci.duration_tier AND pp.is_active = 1
+            WHERE u.telegram_id = ?
+            ORDER BY ci.added_at
+        """, (user_id,))
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def cart_add(user_id: int, product_id: int, duration_tier: str, quantity: int = 1) -> None:
+    """Savatga mahsulot qo'shadi yoki miqdorini oshiradi"""
+    async with get_db() as db:
+        # Avval users.id ni topish
+        cursor = await db.execute("SELECT id FROM users WHERE telegram_id = ?", (user_id,))
+        row = await cursor.fetchone()
+        if not row:
+            return
+        db_user_id = row["id"]
+
+        existing = await db.execute(
+            "SELECT id, quantity FROM cart_items WHERE user_id = ? AND product_id = ? AND duration_tier = ?",
+            (db_user_id, product_id, duration_tier)
+        )
+        ex_row = await existing.fetchone()
+        if ex_row:
+            await db.execute(
+                "UPDATE cart_items SET quantity = ? WHERE id = ?",
+                (ex_row["quantity"] + quantity, ex_row["id"])
+            )
+        else:
+            await db.execute(
+                "INSERT INTO cart_items (user_id, product_id, duration_tier, quantity) VALUES (?, ?, ?, ?)",
+                (db_user_id, product_id, duration_tier, quantity)
+            )
+        await db.commit()
+
+
+async def cart_update_qty(user_id: int, product_id: int, duration_tier: str, quantity: int) -> None:
+    """Savat elementining miqdorini yangilaydi (0 bo'lsa o'chiradi)"""
+    async with get_db() as db:
+        cursor = await db.execute("SELECT id FROM users WHERE telegram_id = ?", (user_id,))
+        row = await cursor.fetchone()
+        if not row:
+            return
+        db_user_id = row["id"]
+
+        if quantity <= 0:
+            await db.execute(
+                "DELETE FROM cart_items WHERE user_id = ? AND product_id = ? AND duration_tier = ?",
+                (db_user_id, product_id, duration_tier)
+            )
+        else:
+            await db.execute(
+                "UPDATE cart_items SET quantity = ? WHERE user_id = ? AND product_id = ? AND duration_tier = ?",
+                (quantity, db_user_id, product_id, duration_tier)
+            )
+        await db.commit()
+
+
+async def cart_remove_item(cart_item_id: int) -> None:
+    """Savat elementini ID bo'yicha o'chiradi"""
+    async with get_db() as db:
+        await db.execute("DELETE FROM cart_items WHERE id = ?", (cart_item_id,))
+        await db.commit()
+
+
+async def cart_clear(user_id: int) -> None:
+    """Foydalanuvchi savatini tozalaydi"""
+    async with get_db() as db:
+        cursor = await db.execute("SELECT id FROM users WHERE telegram_id = ?", (user_id,))
+        row = await cursor.fetchone()
+        if not row:
+            return
+        await db.execute("DELETE FROM cart_items WHERE user_id = ?", (row["id"],))
+        await db.commit()
+
+
+async def cart_item_in_cart(user_id: int, product_id: int, duration_tier: str) -> Optional[dict]:
+    """Savatda bu mahsulot/tier borligini tekshiradi"""
+    async with get_db() as db:
+        cursor = await db.execute("SELECT id FROM users WHERE telegram_id = ?", (user_id,))
+        row = await cursor.fetchone()
+        if not row:
+            return None
+        db_user_id = row["id"]
+        cursor2 = await db.execute(
+            "SELECT * FROM cart_items WHERE user_id = ? AND product_id = ? AND duration_tier = ?",
+            (db_user_id, product_id, duration_tier)
+        )
+        r = await cursor2.fetchone()
+        return dict(r) if r else None
+
+
+# ==================== PROMO CODES ====================
+
+async def get_promo_by_code(code: str) -> Optional[dict]:
+    """Promo kodni topadi"""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT * FROM promo_codes WHERE code = ? AND is_active = 1",
+            (code.upper().strip(),)
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def increment_promo_usage(promo_id: int) -> None:
+    """Promo kod foydalanish sonini oshiradi"""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE promo_codes SET used_count = used_count + 1 WHERE id = ?",
+            (promo_id,)
+        )
+        await db.commit()
+
+
+# ==================== VIP LEVELS ====================
+
+async def get_vip_level(level: str) -> Optional[dict]:
+    """VIP daraja ma'lumotini qaytaradi"""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT * FROM vip_levels WHERE level = ?", (level,)
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def get_all_vip_levels() -> list[dict]:
+    """Barcha VIP darajalarni qaytaradi"""
+    async with get_db() as db:
+        cursor = await db.execute("SELECT * FROM vip_levels ORDER BY min_purchases")
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def update_user_vip(telegram_id: int) -> str:
+    """
+    Foydalanuvchi xarid soniga qarab VIP darajasini yangilaydi.
+    Yangi darajani qaytaradi.
+    """
+    user = await get_user(telegram_id)
+    if not user:
+        return "standard"
+
+    total = user.get("total_purchases", 0)
+    levels = await get_all_vip_levels()
+
+    new_level = "standard"
+    for lv in sorted(levels, key=lambda x: x["min_purchases"], reverse=True):
+        if total >= lv["min_purchases"]:
+            new_level = lv["level"]
+            break
+
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE users SET vip_level = ? WHERE telegram_id = ?",
+            (new_level, telegram_id)
+        )
+        await db.commit()
+    return new_level
+
+
+# ==================== ORDERS ====================
+
+async def create_order(
+    user_telegram_id: int,
+    total_amount: int,
+    discount_amount: int = 0,
+    promo_code_id: Optional[int] = None
+) -> int:
+    """Yangi buyurtma yaratadi, order_id qaytaradi"""
+    async with get_db() as db:
+        cursor_u = await db.execute("SELECT id FROM users WHERE telegram_id = ?", (user_telegram_id,))
+        u_row = await cursor_u.fetchone()
+        if not u_row:
+            raise ValueError("Foydalanuvchi topilmadi")
+        db_user_id = u_row["id"]
+
+        cursor = await db.execute("""
+            INSERT INTO orders (user_id, total_amount, discount_amount, promo_code_id, status)
+            VALUES (?, ?, ?, ?, 'pending_payment')
+        """, (db_user_id, total_amount, discount_amount, promo_code_id))
+        await db.commit()
+        return cursor.lastrowid
+
+
+async def get_order(order_id: int) -> Optional[dict]:
+    """Buyurtmani ID bo'yicha topadi (user telegram_id bilan)"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT o.*, u.telegram_id as user_telegram_id, u.language as user_lang,
+                   u.username as user_username, u.full_name as user_full_name
+            FROM orders o
+            JOIN users u ON u.id = o.user_id
+            WHERE o.id = ?
+        """, (order_id,))
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def get_user_orders(telegram_id: int, limit: int = 20, offset: int = 0) -> list[dict]:
+    """Foydalanuvchi buyurtmalarini qaytaradi"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT o.* FROM orders o
+            JOIN users u ON u.id = o.user_id
+            WHERE u.telegram_id = ?
+            ORDER BY o.created_at DESC
+            LIMIT ? OFFSET ?
+        """, (telegram_id, limit, offset))
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def get_user_active_order(telegram_id: int) -> Optional[dict]:
+    """Foydalanuvchining joriy aktiv buyurtmasini topadi"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT o.* FROM orders o
+            JOIN users u ON u.id = o.user_id
+            WHERE u.telegram_id = ? AND o.status IN ('pending_payment', 'payment_sent')
+            ORDER BY o.created_at DESC LIMIT 1
+        """, (telegram_id,))
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def update_order_status(order_id: int, status: str, **extra) -> None:
+    """Buyurtma statusini yangilaydi"""
+    allowed_extra = {"payment_screenshot_file_id", "payment_verified_by",
+                     "payment_verified_at", "progress_message_id", "note"}
+    fields = {"status": status, "updated_at": "CURRENT_TIMESTAMP"}
+    fields.update({k: v for k, v in extra.items() if k in allowed_extra})
+
+    set_parts = []
+    values = []
+    for k, v in fields.items():
+        if v == "CURRENT_TIMESTAMP":
+            set_parts.append(f"{k} = CURRENT_TIMESTAMP")
+        else:
+            set_parts.append(f"{k} = ?")
+            values.append(v)
+    values.append(order_id)
+
+    async with get_db() as db:
+        await db.execute(
+            f"UPDATE orders SET {', '.join(set_parts)} WHERE id = ?", values
+        )
+        await db.commit()
+
+
+async def set_order_progress_message(order_id: int, message_id: int) -> None:
+    """Progress bar message_id ni saqlaydi"""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE orders SET progress_message_id = ? WHERE id = ?",
+            (message_id, order_id)
+        )
+        await db.commit()
+
+
+async def count_user_orders(telegram_id: int) -> int:
+    """Foydalanuvchi buyurtmalari sonini qaytaradi"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT COUNT(*) as cnt FROM orders o
+            JOIN users u ON u.id = o.user_id
+            WHERE u.telegram_id = ?
+        """, (telegram_id,))
+        row = await cursor.fetchone()
+        return row["cnt"] if row else 0
+
+
+# ==================== ORDER ITEMS ====================
+
+async def create_order_item(
+    order_id: int,
+    product_id: int,
+    quantity: int,
+    duration_tier: str,
+    unit_price: int,
+    cost_price: int = 0
+) -> int:
+    """Buyurtma elementi yaratadi"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            INSERT INTO order_items
+                (order_id, product_id, quantity, duration_tier, unit_price, cost_price, status)
+            VALUES (?, ?, ?, ?, ?, ?, 'pending')
+        """, (order_id, product_id, quantity, duration_tier, unit_price, cost_price))
+        await db.commit()
+        return cursor.lastrowid
+
+
+async def get_order_items(order_id: int) -> list[dict]:
+    """Buyurtma elementlarini qaytaradi (akkaunt + mahsulot ma'lumotlari bilan)"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT oi.*, p.name_uz, p.name_ru,
+                   p.instruction_video_file_id as product_video,
+                   p.category_id,
+                   a.login, a.password, a.expiry_date as account_expiry,
+                   a.additional_data,
+                   c.instruction_video_file_id as category_video
+            FROM order_items oi
+            JOIN products p ON p.id = oi.product_id
+            LEFT JOIN accounts a ON a.id = oi.account_id
+            LEFT JOIN categories c ON c.id = p.category_id
+            WHERE oi.order_id = ?
+            ORDER BY oi.id
+        """, (order_id,))
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def update_order_item(item_id: int, **kwargs) -> None:
+    """Buyurtma elementini yangilaydi"""
+    allowed = {"account_id", "status", "delivered_at", "expiry_date"}
+    fields = {k: v for k, v in kwargs.items() if k in allowed}
+    if not fields:
+        return
+    set_clause = ", ".join(f"{k} = ?" for k in fields)
+    values = list(fields.values()) + [item_id]
+    async with get_db() as db:
+        await db.execute(
+            f"UPDATE order_items SET {set_clause} WHERE id = ?", values
+        )
+        await db.commit()
+
+
+# ==================== ACCOUNTS: REZERV + SOTISH ====================
+
+async def reserve_accounts_for_order(
+    order_id: int,
+    product_id: int,
+    duration_tier: str,
+    quantity: int
+) -> list[dict]:
+    """
+    Buyurtma uchun eng kam remaining_days bo'lgan akkauntlarni band qiladi.
+    Yetarli bo'lmasa bo'sh list qaytaradi.
+    """
+    async with get_db() as db:
+        # Mavjud akkauntlarni tekshirish
+        cursor = await db.execute("""
+            SELECT id, login, password, expiry_date, remaining_days FROM accounts
+            WHERE product_id = ? AND duration_tier = ? AND status = 'available'
+            ORDER BY remaining_days ASC
+            LIMIT ?
+        """, (product_id, duration_tier, quantity))
+        rows = await cursor.fetchall()
+
+        if len(rows) < quantity:
+            return []
+
+        reserved = []
+        for row in rows:
+            await db.execute("""
+                UPDATE accounts
+                SET status = 'reserved',
+                    reserved_for_order_id = ?,
+                    reserved_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (order_id, row["id"]))
+            reserved.append(dict(row))
+
+        await db.commit()
+        return reserved
+
+
+async def release_reserved_accounts(order_id: int) -> None:
+    """Band qilingan akkauntlarni ozod qiladi (timeout yoki bekor qilish)"""
+    async with get_db() as db:
+        await db.execute("""
+            UPDATE accounts
+            SET status = 'available',
+                reserved_for_order_id = NULL,
+                reserved_at = NULL
+            WHERE reserved_for_order_id = ? AND status = 'reserved'
+        """, (order_id,))
+        await db.commit()
+
+
+async def sell_account(
+    account_id: int,
+    user_telegram_id: int,
+    sold_via: str = "bot_order"
+) -> None:
+    """Akkauntni sotilgan deb belgilaydi"""
+    async with get_db() as db:
+        await db.execute("""
+            UPDATE accounts
+            SET status = 'sold',
+                sold_to_user_id = ?,
+                sold_at = CURRENT_TIMESTAMP,
+                sold_via = ?
+            WHERE id = ?
+        """, (user_telegram_id, sold_via, account_id))
+        await db.commit()
+
+
+async def get_reserved_accounts_for_order(order_id: int) -> list[dict]:
+    """Buyurtma uchun band qilingan akkauntlarni qaytaradi"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT a.*, p.name_uz, p.name_ru,
+                   p.instruction_video_file_id as product_video,
+                   p.category_id
+            FROM accounts a
+            JOIN products p ON p.id = a.product_id
+            WHERE a.reserved_for_order_id = ? AND a.status = 'reserved'
+            ORDER BY a.remaining_days ASC
+        """, (order_id,))
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def get_direct_sale_account(token: str) -> Optional[dict]:
+    """Direct sale token bo'yicha akkauntni topadi"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT a.*, p.name_uz, p.name_ru,
+                   p.instruction_video_file_id as product_video,
+                   p.category_id,
+                   c.instruction_video_file_id as category_video
+            FROM accounts a
+            JOIN products p ON p.id = a.product_id
+            LEFT JOIN categories c ON c.id = p.category_id
+            WHERE a.direct_sale_token = ? AND a.status = 'available'
+        """, (token,))
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def get_next_available_account(product_id: int, duration_tier: str) -> Optional[dict]:
+    """Shu product+tier dagi birinchi available akkauntni qaytaradi"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT * FROM accounts
+            WHERE product_id = ? AND duration_tier = ? AND status = 'available'
+            ORDER BY remaining_days ASC
+            LIMIT 1
+        """, (product_id, duration_tier))
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def set_direct_sale_token(account_id: int, token: str) -> None:
+    """Akkauntga direct sale token o'rnatadi"""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE accounts SET direct_sale_token = ? WHERE id = ?",
+            (token, account_id)
+        )
+        await db.commit()
+
+
+# ==================== PRODUCTS: PURCHASE COUNT ====================
+
+async def increment_purchase_count(product_id: int, qty: int = 1) -> None:
+    """Mahsulot xarid sonini oshiradi"""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE products SET purchase_count = purchase_count + ? WHERE id = ?",
+            (qty, product_id)
+        )
+        await db.commit()
+
+
+async def update_user_stats(telegram_id: int, amount: int, qty: int = 1) -> None:
+    """Foydalanuvchi umumiy xarid/summasini yangilaydi"""
+    async with get_db() as db:
+        await db.execute("""
+            UPDATE users
+            SET total_purchases = total_purchases + ?,
+                total_spent = total_spent + ?
+            WHERE telegram_id = ?
+        """, (qty, amount, telegram_id))
+        await db.commit()
+
+
+# ==================== REVIEWS ====================
+
+async def get_product_rating(product_id: int) -> dict:
+    """Mahsulot o'rtacha reytingi va sharhlar sonini qaytaradi"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT AVG(rating) as avg_rating, COUNT(*) as review_count
+            FROM reviews
+            WHERE product_id = ? AND is_visible = 1
+        """, (product_id,))
+        row = await cursor.fetchone()
+        return {
+            "avg": round(row["avg_rating"], 1) if row["avg_rating"] else 0.0,
+            "count": row["review_count"]
+        }
+
+
+# ==================== FAVORITES ====================
+
+async def add_favorite(user_telegram_id: int, product_id: int) -> None:
+    """Sevimlilarga qo'shadi"""
+    async with get_db() as db:
+        cursor = await db.execute("SELECT id FROM users WHERE telegram_id = ?", (user_telegram_id,))
+        row = await cursor.fetchone()
+        if not row:
+            return
+        await db.execute(
+            "INSERT OR IGNORE INTO favorites (user_id, product_id) VALUES (?, ?)",
+            (row["id"], product_id)
+        )
+        await db.commit()
+
+
+async def remove_favorite(user_telegram_id: int, product_id: int) -> None:
+    """Sevimlilardan o'chiradi"""
+    async with get_db() as db:
+        cursor = await db.execute("SELECT id FROM users WHERE telegram_id = ?", (user_telegram_id,))
+        row = await cursor.fetchone()
+        if not row:
+            return
+        await db.execute(
+            "DELETE FROM favorites WHERE user_id = ? AND product_id = ?",
+            (row["id"], product_id)
+        )
+        await db.commit()
+
+
+async def is_favorite(user_telegram_id: int, product_id: int) -> bool:
+    """Mahsulot sevimlilar ro'yxatida borligini tekshiradi"""
+    async with get_db() as db:
+        cursor = await db.execute("SELECT id FROM users WHERE telegram_id = ?", (user_telegram_id,))
+        row = await cursor.fetchone()
+        if not row:
+            return False
+        cursor2 = await db.execute(
+            "SELECT id FROM favorites WHERE user_id = ? AND product_id = ?",
+            (row["id"], product_id)
+        )
+        return (await cursor2.fetchone()) is not None
+
+
+# ==================== STOCK NOTIFICATIONS ====================
+
+async def add_stock_notification(user_telegram_id: int, product_id: int) -> None:
+    """Stok bildirishnoma qo'shadi"""
+    async with get_db() as db:
+        cursor = await db.execute("SELECT id FROM users WHERE telegram_id = ?", (user_telegram_id,))
+        row = await cursor.fetchone()
+        if not row:
+            return
+        await db.execute(
+            "INSERT OR IGNORE INTO stock_notifications (user_id, product_id) VALUES (?, ?)",
+            (row["id"], product_id)
+        )
+        await db.commit()
+
+
+async def get_stock_notification_users(product_id: int) -> list[int]:
+    """Shu mahsulotga bildirishnoma so'ragan foydalanuvchilar telegram_id larini qaytaradi"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT u.telegram_id FROM stock_notifications sn
+            JOIN users u ON u.id = sn.user_id
+            WHERE sn.product_id = ? AND sn.notified = 0
+        """, (product_id,))
+        rows = await cursor.fetchall()
+        return [r["telegram_id"] for r in rows]
+
+
+async def mark_stock_notified(product_id: int) -> None:
+    """Shu mahsulot bildirishnomalarini yuborilgan deb belgilaydi"""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE stock_notifications SET notified = 1 WHERE product_id = ?",
+            (product_id,)
+        )
+        await db.commit()
+
+
+async def get_low_stock_products(threshold: int = 3) -> list[dict]:
+    """Kamligi past mahsulot+tierlarni qaytaradi"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT a.product_id, a.duration_tier, COUNT(*) as cnt,
+                   p.name_uz, p.name_ru
+            FROM accounts a
+            JOIN products p ON p.id = a.product_id
+            WHERE a.status = 'available'
+            GROUP BY a.product_id, a.duration_tier
+            HAVING cnt <= ?
+        """, (threshold,))
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def get_all_managers_and_bosses() -> list[int]:
+    """Manager va boss telegram_id larini qaytaradi"""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT telegram_id FROM admin_roles WHERE role IN ('manager','boss') AND is_active = 1"
+        )
+        rows = await cursor.fetchall()
+        return [r["telegram_id"] for r in rows]
+
+
+# ==================== PENDING ORDERS: TIMEOUT ====================
+
+async def get_expired_pending_orders(timeout_minutes: int = 30) -> list[dict]:
+    """To'lov muddati o'tgan buyurtmalarni qaytaradi"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT o.*, u.telegram_id as user_telegram_id, u.language as user_lang
+            FROM orders o
+            JOIN users u ON u.id = o.user_id
+            WHERE o.status IN ('pending_payment', 'payment_sent')
+              AND datetime(o.created_at, '+' || ? || ' minutes') < datetime('now')
+        """, (timeout_minutes,))
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]

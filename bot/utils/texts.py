@@ -416,6 +416,484 @@ TEXTS: dict[str, dict[str, str]] = {
         "uz": "❌ Ma'lumot topilmadi.",
         "ru": "❌ Данные не найдены."
     },
+
+    # ==================== KATALOG ====================
+    "no_categories": {
+        "uz": "Hozircha kategoriyalar yo'q.",
+        "ru": "Категорий пока нет."
+    },
+    "select_category": {
+        "uz": "📦 Kategoriyani tanlang:",
+        "ru": "📦 Выберите категорию:"
+    },
+    "select_product": {
+        "uz": "📦 Mahsulotni tanlang:",
+        "ru": "📦 Выберите товар:"
+    },
+    "no_products_in_cat": {
+        "uz": "Bu kategoriyada mahsulotlar yo'q.",
+        "ru": "В этой категории нет товаров."
+    },
+    "btn_add_to_cart": {
+        "uz": "🛒 Savatga",
+        "ru": "🛒 В корзину"
+    },
+    "btn_add_favorite": {
+        "uz": "⭐ Sevimlilarga",
+        "ru": "⭐ В избранное"
+    },
+    "btn_remove_favorite": {
+        "uz": "💔 Sevimlilardan",
+        "ru": "💔 Из избранного"
+    },
+    "btn_notify_stock": {
+        "uz": "🔔 Kelganda xabar",
+        "ru": "🔔 Уведомить о наличии"
+    },
+    "stock_notify_set": {
+        "uz": "✅ Mahsulot paydo bo'lganda xabar beramiz!",
+        "ru": "✅ Уведомим когда товар появится!"
+    },
+    "added_to_favorites": {
+        "uz": "⭐ Sevimlilarga qo'shildi!",
+        "ru": "⭐ Добавлено в избранное!"
+    },
+    "removed_from_favorites": {
+        "uz": "💔 Sevimlilardan olib tashlandi.",
+        "ru": "💔 Удалено из избранного."
+    },
+    "sold_out": {
+        "uz": "Tugagan",
+        "ru": "Нет в наличии"
+    },
+    "select_quantity": {
+        "uz": "🔢 Nechta xarid qilasiz?\nMavjud: {available} ta",
+        "ru": "🔢 Сколько купить?\nДоступно: {available} шт"
+    },
+    "enter_quantity": {
+        "uz": "✏️ Miqdorni kiriting (1-{max}):",
+        "ru": "✏️ Введите количество (1-{max}):"
+    },
+    "qty_exceeds_stock": {
+        "uz": "❌ Faqat {available} ta mavjud!",
+        "ru": "❌ Доступно только {available} шт!"
+    },
+    "qty_invalid": {
+        "uz": "❌ Noto'g'ri son! 1 dan {max} gacha kiriting.",
+        "ru": "❌ Неверное число! Введите от 1 до {max}."
+    },
+    "added_to_cart": {
+        "uz": "✅ {name} ({tier}) x{qty} savatga qo'shildi!",
+        "ru": "✅ {name} ({tier}) x{qty} добавлено в корзину!"
+    },
+    "btn_view_cart": {
+        "uz": "🛒 Savatni ko'rish",
+        "ru": "🛒 Посмотреть корзину"
+    },
+    "btn_continue": {
+        "uz": "🛍 Davom ettirish",
+        "ru": "🛍 Продолжить покупки"
+    },
+    "in_cart_badge": {
+        "uz": "🛒 Savatda: {qty} dona ({tier})",
+        "ru": "🛒 В корзине: {qty} шт ({tier})"
+    },
+
+    # ==================== SAVAT ====================
+    "cart_title": {
+        "uz": "🛒 Sizning savatingiz:",
+        "ru": "🛒 Ваша корзина:"
+    },
+    "cart_empty": {
+        "uz": "🛒 Savat bo'sh.\n\n📦 Mahsulotlarni ko'rish uchun tugmani bosing.",
+        "ru": "🛒 Корзина пуста.\n\n📦 Нажмите кнопку для просмотра товаров."
+    },
+    "cart_vip_line": {
+        "uz": "💎 VIP: {vip_name} ({pct}% chegirma)",
+        "ru": "💎 VIP: {vip_name} ({pct}% скидка)"
+    },
+    "cart_item_line": {
+        "uz": "{num}. {name} ({tier}) x{qty} — {price:,} so'm",
+        "ru": "{num}. {name} ({tier}) x{qty} — {price:,} сум"
+    },
+    "cart_total": {
+        "uz": "💰 Jami: {total:,} so'm",
+        "ru": "💰 Итого: {total:,} сум"
+    },
+    "cart_discount_line": {
+        "uz": "{icon} {label}: -{pct}% (-{amount:,} so'm)",
+        "ru": "{icon} {label}: -{pct}% (-{amount:,} сум)"
+    },
+    "cart_final": {
+        "uz": "💰 To'lov: {final:,} so'm",
+        "ru": "💰 К оплате: {final:,} сум"
+    },
+    "btn_promo": {
+        "uz": "🏷 Promo-kod",
+        "ru": "🏷 Промо-код"
+    },
+    "btn_clear_cart": {
+        "uz": "🗑 Tozalash",
+        "ru": "🗑 Очистить"
+    },
+    "btn_checkout": {
+        "uz": "✅ Buyurtma berish",
+        "ru": "✅ Оформить заказ"
+    },
+    "ask_promo_code": {
+        "uz": "🏷 Promo kodingizni kiriting:",
+        "ru": "🏷 Введите промо-код:"
+    },
+    "promo_valid": {
+        "uz": "✅ Promo kod qo'llanildi! -{pct}% chegirma",
+        "ru": "✅ Промо-код применён! -{pct}% скидка"
+    },
+    "promo_invalid": {
+        "uz": "❌ Promo kod yaroqsiz yoki muddati o'tgan.",
+        "ru": "❌ Промо-код недействителен или истёк."
+    },
+    "cart_cleared": {
+        "uz": "🗑 Savat tozalandi.",
+        "ru": "🗑 Корзина очищена."
+    },
+
+    # ==================== BUYURTMA ====================
+    "order_creating": {
+        "uz": "⏳ Buyurtma yaratilmoqda...",
+        "ru": "⏳ Создание заказа..."
+    },
+    "order_insufficient_stock": {
+        "uz": "❌ Yetarli akkaunt yo'q!\n{details}\n\nIltimos, miqdorni kamaytiring yoki keyinroq urinib ko'ring.",
+        "ru": "❌ Недостаточно аккаунтов!\n{details}\n\nПожалуйста, уменьшите количество или попробуйте позже."
+    },
+    "order_created_progress": {
+        "uz": "✅ Buyurtma #{order_id} yaratildi!\n"
+              "⬜⬜⬜⬜ To'lov kutilmoqda\n\n"
+              "💰 {amount:,} so'm\n"
+              "💳 Click: {click}\n"
+              "💳 Payme: {payme}\n\n"
+              "📸 Chekni shu yerga yuboring\n"
+              "⏳ 30 daqiqa vaqtingiz bor!",
+        "ru": "✅ Заказ #{order_id} создан!\n"
+              "⬜⬜⬜⬜ Ожидание оплаты\n\n"
+              "💰 {amount:,} сум\n"
+              "💳 Click: {click}\n"
+              "💳 Payme: {payme}\n\n"
+              "📸 Отправьте чек сюда\n"
+              "⏳ У вас 30 минут!"
+    },
+    "progress_pending": {
+        "uz": "⬜⬜⬜⬜ To'lov kutilmoqda",
+        "ru": "⬜⬜⬜⬜ Ожидание оплаты"
+    },
+    "progress_sent": {
+        "uz": "🟩⬜⬜⬜ Chek yuborildi",
+        "ru": "🟩⬜⬜⬜ Чек отправлен"
+    },
+    "progress_confirmed": {
+        "uz": "🟩🟩🟩🟩 Tayyor!",
+        "ru": "🟩🟩🟩🟩 Готово!"
+    },
+    "progress_partial": {
+        "uz": "🟩🟩🟨⬜ Qisman tayyor",
+        "ru": "🟩🟩🟨⬜ Частично готово"
+    },
+    "progress_cancelled": {
+        "uz": "❌ Bekor qilindi",
+        "ru": "❌ Отменён"
+    },
+    "payment_received": {
+        "uz": "📸 Chekingiz qabul qilindi! Admin tezda tekshiradi.",
+        "ru": "📸 Ваш чек принят! Администратор скоро проверит."
+    },
+    "order_delivered": {
+        "uz": "✅ To'lov tasdiqlandi! Buyurtma #{order_id}\n🟩🟩🟩🟩 Tayyor!\n\n{accounts_text}",
+        "ru": "✅ Оплата подтверждена! Заказ #{order_id}\n🟩🟩🟩🟩 Готово!\n\n{accounts_text}"
+    },
+    "account_delivery_line": {
+        "uz": "{num}. <b>{name}</b>\n👤 Login: <code>{login}</code>\n🔑 Parol: <code>{password}</code>\n📅 Muddat: {expiry}",
+        "ru": "{num}. <b>{name}</b>\n👤 Логин: <code>{login}</code>\n🔑 Пароль: <code>{password}</code>\n📅 До: {expiry}"
+    },
+    "order_cancelled_timeout": {
+        "uz": "⏳ Buyurtma #{order_id} bekor qilindi (to'lov vaqti o'tdi).",
+        "ru": "⏳ Заказ #{order_id} отменён (истекло время оплаты)."
+    },
+    "no_active_order": {
+        "uz": "❌ Aktiv buyurtmangiz topilmadi. Avval mahsulot tanlang.",
+        "ru": "❌ Активный заказ не найден. Сначала выберите товар."
+    },
+    "send_payment_screenshot": {
+        "uz": "📸 To'lov chekini (screenshot) yuboring:",
+        "ru": "📸 Отправьте скриншот чека оплаты:"
+    },
+
+    # ==================== ADMIN: GURUH XABARI ====================
+    "group_payment_notify": {
+        "uz": "💳 <b>To'lov cheki</b> — Buyurtma #{order_id}\n"
+              "👤 {full_name} (@{username})\n"
+              "💰 {amount:,} so'm\n\n"
+              "{items_text}",
+        "ru": "💳 <b>Чек оплаты</b> — Заказ #{order_id}\n"
+              "👤 {full_name} (@{username})\n"
+              "💰 {amount:,} сум\n\n"
+              "{items_text}"
+    },
+    "btn_confirm_payment": {
+        "uz": "✅ To'lovni tasdiqlash",
+        "ru": "✅ Подтвердить оплату"
+    },
+    "btn_partial_confirm": {
+        "uz": "🔶 Qisman tasdiqlash",
+        "ru": "🔶 Частичное подтверждение"
+    },
+    "btn_reject_payment": {
+        "uz": "❌ Rad etish",
+        "ru": "❌ Отклонить"
+    },
+    "payment_confirmed_admin": {
+        "uz": "✅ To'lov tasdiqlandi! Akkauntlar yuborildi.",
+        "ru": "✅ Оплата подтверждена! Аккаунты отправлены."
+    },
+    "order_partial_text": {
+        "uz": "🔶 Buyurtma #{order_id} — Qisman tasdiqlash\nHar bir element uchun tasdiqlang:",
+        "ru": "🔶 Заказ #{order_id} — Частичное подтверждение\nПодтвердите каждый элемент:"
+    },
+    "partial_delivered_notify": {
+        "uz": "📦 Buyurtma #{order_id}: {delivered} ta tayyor, {pending} ta kutilmoqda.\n🟩🟩🟨⬜\n\n{accounts_text}",
+        "ru": "📦 Заказ #{order_id}: {delivered} готово, {pending} ожидается.\n🟩🟩🟨⬜\n\n{accounts_text}"
+    },
+
+    # ==================== MENING BUYURTMALARIM ====================
+    "my_orders_title": {
+        "uz": "📋 Buyurtmalarim:",
+        "ru": "📋 Мои заказы:"
+    },
+    "no_orders": {
+        "uz": "📋 Hozircha buyurtmalaringiz yo'q.",
+        "ru": "📋 У вас пока нет заказов."
+    },
+    "order_status_pending": {
+        "uz": "⬜ To'lov kutilmoqda",
+        "ru": "⬜ Ожидание оплаты"
+    },
+    "order_status_sent": {
+        "uz": "🟩 Chek yuborildi",
+        "ru": "🟩 Чек отправлен"
+    },
+    "order_status_confirmed": {
+        "uz": "✅ Yetkazildi",
+        "ru": "✅ Доставлено"
+    },
+    "order_status_partial": {
+        "uz": "🟡 Qisman yetkazildi",
+        "ru": "🟡 Частично доставлено"
+    },
+    "order_status_cancelled": {
+        "uz": "❌ Bekor qilindi",
+        "ru": "❌ Отменён"
+    },
+    "order_detail": {
+        "uz": "📋 Buyurtma #{order_id}\n"
+              "Sana: {date}\n"
+              "Status: {status}\n"
+              "Summa: {amount:,} so'm\n\n"
+              "{items}",
+        "ru": "📋 Заказ #{order_id}\n"
+              "Дата: {date}\n"
+              "Статус: {status}\n"
+              "Сумма: {amount:,} сум\n\n"
+              "{items}"
+    },
+    "order_item_detail": {
+        "uz": "• {name} ({tier}) x{qty}\n  Login: <code>{login}</code>\n  Parol: <code>{password}</code>\n  Muddat: {expiry}",
+        "ru": "• {name} ({tier}) x{qty}\n  Логин: <code>{login}</code>\n  Пароль: <code>{password}</code>\n  До: {expiry}"
+    },
+    "order_item_pending": {
+        "uz": "• {name} ({tier}) x{qty} — kutilmoqda",
+        "ru": "• {name} ({tier}) x{qty} — ожидается"
+    },
+    "btn_instruction_video": {
+        "uz": "📹 Instruksiya",
+        "ru": "📹 Инструкция"
+    },
+    "btn_prev_page": {
+        "uz": "◀️",
+        "ru": "◀️"
+    },
+    "btn_next_page": {
+        "uz": "▶️",
+        "ru": "▶️"
+    },
+
+    # ==================== DIRECT SALE ====================
+    "ds_title": {
+        "uz": "🛒 Direct Sale:",
+        "ru": "🛒 Прямая продажа:"
+    },
+    "ds_account_info": {
+        "uz": "🛒 Sotish: <b>{name}</b> ({tier})\n"
+              "📊 Mavjud: {available} ta\n"
+              "🔢 Birinchi: #{acc_id} ({days} kun)\n\n"
+              "👤 Login: <code>{login}</code>\n"
+              "🔑 Parol: <code>{password}</code>\n"
+              "📅 Muddat: {expiry}\n\n"
+              "🔗 Link: {link}",
+        "ru": "🛒 Продажа: <b>{name}</b> ({tier})\n"
+              "📊 Доступно: {available} шт\n"
+              "🔢 Первый: #{acc_id} ({days} дней)\n\n"
+              "👤 Логин: <code>{login}</code>\n"
+              "🔑 Пароль: <code>{password}</code>\n"
+              "📅 До: {expiry}\n\n"
+              "🔗 Ссылка: {link}"
+    },
+    "btn_ds_copy": {
+        "uz": "📋 Nusxalash",
+        "ru": "📋 Скопировать"
+    },
+    "btn_ds_sold": {
+        "uz": "✅ Sotildi",
+        "ru": "✅ Продано"
+    },
+    "btn_ds_next": {
+        "uz": "⏭ Keyingisi",
+        "ru": "⏭ Следующий"
+    },
+    "ds_sold_success": {
+        "uz": "✅ Akkaunt sotildi!",
+        "ru": "✅ Аккаунт продан!"
+    },
+    "ds_no_accounts": {
+        "uz": "❌ Bu mahsulot/tier uchun mavjud akkaunt yo'q.",
+        "ru": "❌ Нет доступных аккаунтов для этого товара/тира."
+    },
+    "ds_link_expired": {
+        "uz": "❌ Bu link eskirgan yoki akkaunt sotilgan.",
+        "ru": "❌ Эта ссылка устарела или аккаунт уже продан."
+    },
+    "ds_account_delivered": {
+        "uz": "📦 <b>{name}</b>\n"
+              "👤 Login: <code>{login}</code>\n"
+              "🔑 Parol: <code>{password}</code>\n"
+              "📅 Muddat: {expiry}",
+        "ru": "📦 <b>{name}</b>\n"
+              "👤 Логин: <code>{login}</code>\n"
+              "🔑 Пароль: <code>{password}</code>\n"
+              "📅 До: {expiry}"
+    },
+    "btn_ds_select_cat": {
+        "uz": "🛒 Sotuv — kategoriya tanlang:",
+        "ru": "🛒 Продажа — выберите категорию:"
+    },
+
+    # ==================== FAQ ====================
+    "faq_title": {
+        "uz": "❓ Ko'p beriladigan savollar:",
+        "ru": "❓ Часто задаваемые вопросы:"
+    },
+    "faq_q1": {
+        "uz": "💳 Qanday to'lash mumkin?",
+        "ru": "💳 Как оплатить?"
+    },
+    "faq_a1": {
+        "uz": "💳 <b>To'lov usullari:</b>\n\n"
+              "• Click orqali: 8600 xxxx xxxx xxxx\n"
+              "• Payme orqali: 8600 xxxx xxxx xxxx\n\n"
+              "To'lovdan so'ng chekni botga yuboring — admin tasdiqlaydi!",
+        "ru": "💳 <b>Способы оплаты:</b>\n\n"
+              "• Через Click: 8600 xxxx xxxx xxxx\n"
+              "• Через Payme: 8600 xxxx xxxx xxxx\n\n"
+              "После оплаты отправьте чек боту — администратор подтвердит!"
+    },
+    "faq_q2": {
+        "uz": "⏰ Qancha vaqtda yetkaziladi?",
+        "ru": "⏰ Как быстро доставляют?"
+    },
+    "faq_a2": {
+        "uz": "⏰ <b>Yetkazish vaqti:</b>\n\n"
+              "To'lov tasdiqlangandan keyin <b>5 daqiqa ichida</b> avtomatik yuboriladi!\n\n"
+              "Ish vaqtida (09:00-22:00) tezroq bo'ladi.",
+        "ru": "⏰ <b>Время доставки:</b>\n\n"
+              "После подтверждения оплаты — <b>в течение 5 минут</b> автоматически!\n\n"
+              "В рабочее время (09:00-22:00) быстрее."
+    },
+    "faq_q3": {
+        "uz": "🛡 Kafolat qanday ishlaydi?",
+        "ru": "🛡 Как работает гарантия?"
+    },
+    "faq_a3": {
+        "uz": "🛡 <b>Kafolat:</b>\n\n"
+              "Agar akkaunt ishlamasa yoki ban yesa — <b>bepul almashtiramiz!</b>\n\n"
+              "Kafolat muddati mahsulot sahifasida ko'rsatilgan.",
+        "ru": "🛡 <b>Гарантия:</b>\n\n"
+              "Если аккаунт не работает или забанен — <b>заменим бесплатно!</b>\n\n"
+              "Срок гарантии указан на странице товара."
+    },
+    "faq_q4": {
+        "uz": "🔄 Akkaunt ishlamasa nima qilaman?",
+        "ru": "🔄 Что делать если аккаунт не работает?"
+    },
+    "faq_a4": {
+        "uz": "🔄 <b>Akkaunt ishlamasa:</b>\n\n"
+              "1. «📋 Buyurtmalarim» → buyurtmani tanlang\n"
+              "2. «🔄 Almashtirish» tugmasini bosing\n"
+              "3. Muammoni tasvirlab yozing\n\n"
+              "Admin kafolat muddatida bepul almashtiradi!",
+        "ru": "🔄 <b>Если аккаунт не работает:</b>\n\n"
+              "1. «📋 Мои заказы» → выберите заказ\n"
+              "2. Нажмите «🔄 Замена»\n"
+              "3. Опишите проблему\n\n"
+              "Admin заменит бесплатно в течение гарантийного срока!"
+    },
+    "faq_q5": {
+        "uz": "💰 Nega bunchalik arzon?",
+        "ru": "💰 Почему так дёшево?"
+    },
+    "faq_a5": {
+        "uz": "💰 <b>Nega arzon?</b>\n\n"
+              "Biz akkauntlarni ulgurji sotib olamiz va foydani minimal qilib mijozlarga uzatamiz.\n\n"
+              "Sifat va kafolat — birinchi o'rinda! 🛡",
+        "ru": "💰 <b>Почему дёшево?</b>\n\n"
+              "Мы закупаем аккаунты оптом и передаём выгоду клиентам с минимальной наценкой.\n\n"
+              "Качество и гарантия — на первом месте! 🛡"
+    },
+    "faq_q6": {
+        "uz": "📦 Qaysi mahsulotlar bor?",
+        "ru": "📦 Какие товары есть?"
+    },
+    "faq_a6": {
+        "uz": "📦 <b>Bizning mahsulotlar:</b>\n\n"
+              "Canva Pro, Spotify, YouTube Premium, Netflix, ChatGPT Plus va boshqalar.\n\n"
+              "«📦 Obunalar» bo'limidan to'liq ro'yxatni ko'ring!",
+        "ru": "📦 <b>Наши товары:</b>\n\n"
+              "Canva Pro, Spotify, YouTube Premium, Netflix, ChatGPT Plus и другие.\n\n"
+              "Полный список — в разделе «📦 Подписки»!"
+    },
+    "faq_back": {
+        "uz": "⬅️ FAQ ga qaytish",
+        "ru": "⬅️ К вопросам"
+    },
+    "btn_go_catalog": {
+        "uz": "📦 Mahsulotlar",
+        "ru": "📦 Товары"
+    },
+
+    # ==================== STOK OGOHLANTIRISHLARI ====================
+    "low_stock_admin": {
+        "uz": "⚠️ <b>STOK OGOHLANTIRISH:</b>\n\n{items}",
+        "ru": "⚠️ <b>УВЕДОМЛЕНИЕ О ЗАПАСАХ:</b>\n\n{items}"
+    },
+    "low_stock_item": {
+        "uz": "• {name} ({tier}) — faqat <b>{cnt}</b> ta!",
+        "ru": "• {name} ({tier}) — всего <b>{cnt}</b> шт!"
+    },
+    "stock_restored_notify": {
+        "uz": "🔔 <b>{name}</b> ({tier}) yana sotuvda!\n💰 {price:,} so'm\n\nTez oling — tez tugaydi! 🔥",
+        "ru": "🔔 <b>{name}</b> ({tier}) снова в наличии!\n💰 {price:,} сум\n\nБерите скорей — быстро разбирают! 🔥"
+    },
+    "btn_buy_now": {
+        "uz": "🛒 Xarid qilish",
+        "ru": "🛒 Купить"
+    },
 }
 
 

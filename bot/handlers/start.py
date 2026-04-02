@@ -15,10 +15,10 @@ from bot.utils.texts import t
 router = Router()
 
 
-@router.message(CommandStart())
+@router.message(CommandStart(deep_link=False))
 async def start_handler(message: Message) -> None:
     """
-    /start buyrug'i:
+    /start buyrug'i (deep link bo'lmagan holat):
     - Yangi foydalanuvchi → til tanlash
     - Mavjud foydalanuvchi (onboarding_shown=1) → asosiy menyu
     - Mavjud foydalanuvchi (onboarding_shown=0) → til tanlash

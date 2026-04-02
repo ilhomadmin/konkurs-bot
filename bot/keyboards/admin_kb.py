@@ -18,6 +18,10 @@ def admin_main_menu_kb(lang: str = "uz", role: str = "operator") -> InlineKeyboa
     # Manager va yuqori rollar uchun
     if role in ("manager", "boss"):
         buttons.append([InlineKeyboardButton(text=t("btn_admin_products", lang), callback_data="adm:products")])
+        buttons.append([InlineKeyboardButton(
+            text="🛒 Direct Sale" if lang == "uz" else "🛒 Прямая продажа",
+            callback_data="adm:ds"
+        )])
         buttons.append([InlineKeyboardButton(text=t("btn_admin_promo", lang), callback_data="adm:promo")])
         buttons.append([InlineKeyboardButton(text=t("btn_admin_flash", lang), callback_data="adm:flash")])
         buttons.append([InlineKeyboardButton(text=t("btn_admin_stats", lang), callback_data="adm:stats")])
