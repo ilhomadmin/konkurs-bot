@@ -30,6 +30,22 @@ from bot.handlers.admin.accounts import router as admin_accounts_router
 from bot.handlers.admin.roles import router as admin_roles_router
 from bot.handlers.admin.orders import router as admin_orders_router
 
+# Phase 3 handlers
+from bot.handlers.replacement import router as replacement_router
+from bot.handlers.vip import router as vip_router
+from bot.handlers.favorites import router as favorites_router
+from bot.handlers.review import router as review_router
+from bot.handlers.referral import router as referral_router
+from bot.handlers.auto_renewal import router as auto_renewal_router
+from bot.handlers.bundles import router as bundles_router
+from bot.handlers.contact import router as contact_router
+from bot.handlers.admin.replacement import router as admin_replacement_router
+from bot.handlers.admin.finance import router as admin_finance_router
+from bot.handlers.admin.promo import router as admin_promo_router
+from bot.handlers.admin.flash_sale import router as admin_flash_sale_router
+from bot.handlers.admin.bundles import router as admin_bundles_router
+from bot.handlers.admin.broadcast import router as admin_broadcast_router
+
 # Scheduler
 from bot.scheduler.tasks import setup_scheduler
 
@@ -82,6 +98,22 @@ async def main() -> None:
     dp.include_router(admin_accounts_router)
     dp.include_router(admin_roles_router)
     dp.include_router(admin_orders_router)
+    # Phase 3 user handlers
+    dp.include_router(replacement_router)
+    dp.include_router(vip_router)
+    dp.include_router(favorites_router)
+    dp.include_router(review_router)
+    dp.include_router(referral_router)
+    dp.include_router(auto_renewal_router)
+    dp.include_router(bundles_router)
+    dp.include_router(contact_router)
+    # Phase 3 admin handlers
+    dp.include_router(admin_replacement_router)
+    dp.include_router(admin_finance_router)
+    dp.include_router(admin_promo_router)
+    dp.include_router(admin_flash_sale_router)
+    dp.include_router(admin_bundles_router)
+    dp.include_router(admin_broadcast_router)
 
     # Scheduler (bot instance bilan)
     scheduler = setup_scheduler(bot)

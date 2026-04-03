@@ -894,6 +894,456 @@ TEXTS: dict[str, dict[str, str]] = {
         "uz": "🛒 Xarid qilish",
         "ru": "🛒 Купить"
     },
+    # ==================== ALMASHTIRISH (REPLACEMENT) ====================
+    "replacement_menu": {
+        "uz": "🔄 <b>Almashtirish</b>\n\nGarantiya muddatida ishlamay qolgan hisobni almashtirish uchun so'rov yuboring.",
+        "ru": "🔄 <b>Замена</b>\n\nОтправьте заявку на замену неработающего аккаунта в гарантийный период."
+    },
+    "replacement_select_item": {
+        "uz": "Qaysi buyurtmani almashtirmoqchisiz?",
+        "ru": "Какой заказ хотите заменить?"
+    },
+    "replacement_no_items": {
+        "uz": "❌ Almashtirish mumkin bo'lgan buyurtma yo'q.",
+        "ru": "❌ Нет заказов, доступных для замены."
+    },
+    "replacement_select_reason": {
+        "uz": "Sabab tanlang:",
+        "ru": "Выберите причину:"
+    },
+    "replacement_reason_not_work": {
+        "uz": "❌ Ishlamayapti",
+        "ru": "❌ Не работает"
+    },
+    "replacement_reason_wrong": {
+        "uz": "⚠️ Noto'g'ri hisob",
+        "ru": "⚠️ Неверный аккаунт"
+    },
+    "replacement_reason_expired": {
+        "uz": "⏰ Muddatidan oldin tugadi",
+        "ru": "⏰ Истёк раньше срока"
+    },
+    "replacement_reason_other": {
+        "uz": "💬 Boshqa",
+        "ru": "💬 Другое"
+    },
+    "replacement_enter_description": {
+        "uz": "Muammoni batafsil yozing:",
+        "ru": "Опишите проблему подробнее:"
+    },
+    "replacement_send_screenshot": {
+        "uz": "📸 Skrinshotni yuboring (ixtiyoriy):\n/skip — o'tkazib yuborish",
+        "ru": "📸 Отправьте скриншот (необязательно):\n/skip — пропустить"
+    },
+    "replacement_sent": {
+        "uz": "✅ So'rovingiz qabul qilindi! Operator tez orada ko'rib chiqadi.",
+        "ru": "✅ Ваша заявка принята! Оператор рассмотрит в ближайшее время."
+    },
+    "replacement_new_request": {
+        "uz": "🔄 <b>Yangi almashtirish so'rovi</b>\n\nFoydalanuvchi: {user}\nBuyurtma: #{order_id}\nMahsulot: {product}\nSabab: {reason}\nIzoh: {description}",
+        "ru": "🔄 <b>Новая заявка на замену</b>\n\nПользователь: {user}\nЗаказ: #{order_id}\nТовар: {product}\nПричина: {reason}\nОписание: {description}"
+    },
+    "replacement_approved": {
+        "uz": "✅ Almashtirishingiz tasdiqlandi!\n\n🔑 Login: <code>{login}</code>\n🔒 Parol: <code>{password}</code>\n📅 Muddati: {expiry}",
+        "ru": "✅ Ваша замена одобрена!\n\n🔑 Логин: <code>{login}</code>\n🔒 Пароль: <code>{password}</code>\n📅 Срок: {expiry}"
+    },
+    "replacement_rejected": {
+        "uz": "❌ Almashtirishingiz rad etildi.\n\nSabab: {reason}",
+        "ru": "❌ Ваша замена отклонена.\n\nПричина: {reason}"
+    },
+    "btn_approve_replacement": {
+        "uz": "✅ Tasdiqlash",
+        "ru": "✅ Одобрить"
+    },
+    "btn_reject_replacement": {
+        "uz": "❌ Rad etish",
+        "ru": "❌ Отклонить"
+    },
+
+    # ==================== VIP ====================
+    "vip_page": {
+        "uz": "👑 <b>VIP Dastur</b>\n\nDarajangiz: <b>{level}</b>\nJami xarid: <b>{total:,} so'm</b>\nChegaracha: <b>{next:,} so'm</b>\n\n{bar}\n\n<b>Joriy chegirma: {discount}%</b>",
+        "ru": "👑 <b>VIP Программа</b>\n\nВаш уровень: <b>{level}</b>\nВсего покупок: <b>{total:,} сум</b>\nДо следующего: <b>{next:,} сум</b>\n\n{bar}\n\n<b>Текущая скидка: {discount}%</b>"
+    },
+    "vip_levels": {
+        "uz": "📊 <b>VIP Darajalar:</b>\n\n🥉 Bronze — 500,000 so'mdan | 3% chegirma\n🥈 Silver — 2,000,000 so'mdan | 5% chegirma\n🥇 Gold — 5,000,000 so'mdan | 8% chegirma\n💎 Platinum — 10,000,000 so'mdan | 12% chegirma",
+        "ru": "📊 <b>VIP Уровни:</b>\n\n🥉 Bronze — от 500,000 сум | скидка 3%\n🥈 Silver — от 2,000,000 сум | скидка 5%\n🥇 Gold — от 5,000,000 сум | скидка 8%\n💎 Platinum — от 10,000,000 сум | скидка 12%"
+    },
+    "vip_none": {
+        "uz": "Oddiy foydalanuvchi",
+        "ru": "Обычный пользователь"
+    },
+    "btn_vip_levels": {
+        "uz": "📊 Barcha darajalar",
+        "ru": "📊 Все уровни"
+    },
+
+    # ==================== SEVIMLIlar (FAVORITES) ====================
+    "favorites_page": {
+        "uz": "❤️ <b>Sevimlilar</b>\n\nSaqlab qo'ygan mahsulotlaringiz:",
+        "ru": "❤️ <b>Избранное</b>\n\nВаши сохранённые товары:"
+    },
+    "favorites_empty": {
+        "uz": "❤️ Sevimlilar bo'sh.\n\nMahsulot kartasidagi ❤️ tugmasini bosib qo'shing.",
+        "ru": "❤️ Избранное пусто.\n\nНажмите ❤️ на карточке товара, чтобы добавить."
+    },
+    "favorites_added": {
+        "uz": "❤️ Sevimlilarga qo'shildi!",
+        "ru": "❤️ Добавлено в избранное!"
+    },
+    "favorites_removed": {
+        "uz": "🗑 Sevimlilardan o'chirildi.",
+        "ru": "🗑 Удалено из избранного."
+    },
+    "btn_favorites": {
+        "uz": "❤️ Sevimlilar",
+        "ru": "❤️ Избранное"
+    },
+    "btn_fav_add_cart": {
+        "uz": "🛒 Savatga",
+        "ru": "🛒 В корзину"
+    },
+    "btn_fav_notify": {
+        "uz": "🔔 Xabar",
+        "ru": "🔔 Уведомить"
+    },
+    "btn_remove_fav": {
+        "uz": "🗑 O'chirish",
+        "ru": "🗑 Удалить"
+    },
+
+    # ==================== SHARHLAR (REVIEWS) ====================
+    "review_request": {
+        "uz": "⭐ <b>{product}</b> mahsulotini baholang!\n\nSifat haqida fikringiz muhim.",
+        "ru": "⭐ Оцените товар <b>{product}</b>!\n\nВаше мнение о качестве важно."
+    },
+    "review_comment_prompt": {
+        "uz": "✍️ Izoh yozing (ixtiyoriy):\n/skip — o'tkazib yuborish",
+        "ru": "✍️ Напишите комментарий (необязательно):\n/skip — пропустить"
+    },
+    "review_thanks": {
+        "uz": "✅ Rahmat! Sharhingiz qabul qilindi.",
+        "ru": "✅ Спасибо! Ваш отзыв принят."
+    },
+    "review_already_done": {
+        "uz": "Siz allaqachon baho bergansiz.",
+        "ru": "Вы уже оставили оценку."
+    },
+    "btn_review_skip": {
+        "uz": "➡️ O'tkazib yuborish",
+        "ru": "➡️ Пропустить"
+    },
+
+    # ==================== REFERRAL ====================
+    "referral_page": {
+        "uz": "🤝 <b>Do'stlarni taklif qil</b>\n\nSizning havolangiz:\n<code>{link}</code>\n\nTaklif qilinganlar: <b>{count}</b>\n\nDo'stingiz birinchi xarid qilganda <b>{bonus}</b> so'mlik promo-kod olasiz!",
+        "ru": "🤝 <b>Пригласи друзей</b>\n\nВаша ссылка:\n<code>{link}</code>\n\nПриглашено: <b>{count}</b>\n\nПри первой покупке друга получите промокод на <b>{bonus}</b> сум!"
+    },
+    "referral_welcome": {
+        "uz": "🎁 Siz do'stingiz tavsiyasi bilan keldingiz! Birinchi xariddan keyin bonus olasiz.",
+        "ru": "🎁 Вы пришли по реферальной ссылке! После первой покупки получите бонус."
+    },
+    "referral_bonus_given": {
+        "uz": "🎁 Do'stingiz xarid qildi! Promo-kod: <code>{code}</code> — {discount}% chegirma",
+        "ru": "🎁 Ваш друг совершил покупку! Промокод: <code>{code}</code> — скидка {discount}%"
+    },
+    "btn_copy_referral": {
+        "uz": "📋 Havola nusxalash",
+        "ru": "📋 Скопировать ссылку"
+    },
+    "btn_referral": {
+        "uz": "🤝 Referral",
+        "ru": "🤝 Реферал"
+    },
+
+    # ==================== AUTO-RENEWAL ====================
+    "auto_renewal_page": {
+        "uz": "🔄 <b>Avtomatik yangilash</b>\n\nFaol yangilanishlar: <b>{count}</b>\n\nMuddati tugashidan 1 kun oldin avtomatik yangilanadi.",
+        "ru": "🔄 <b>Автообновление</b>\n\nАктивных обновлений: <b>{count}</b>\n\nАвтоматически продлевается за 1 день до истечения."
+    },
+    "auto_renewal_enabled": {
+        "uz": "✅ Avtomatik yangilash yoqildi.",
+        "ru": "✅ Автообновление включено."
+    },
+    "auto_renewal_disabled": {
+        "uz": "❌ Avtomatik yangilash o'chirildi.",
+        "ru": "❌ Автообновление отключено."
+    },
+    "auto_renewal_executed": {
+        "uz": "🔄 <b>{product}</b> avtomatik yangilandi!\n\n🔑 Login: <code>{login}</code>\n🔒 Parol: <code>{password}</code>\n📅 Yangi muddati: {expiry}",
+        "ru": "🔄 <b>{product}</b> автоматически продлён!\n\n🔑 Логин: <code>{login}</code>\n🔒 Пароль: <code>{password}</code>\n📅 Новый срок: {expiry}"
+    },
+    "auto_renewal_failed": {
+        "uz": "❌ <b>{product}</b> avtomatik yangilanmadi — stok tugagan.",
+        "ru": "❌ <b>{product}</b> не удалось автоматически продлить — нет в наличии."
+    },
+    "btn_enable_renewal": {
+        "uz": "🔄 Yoqish",
+        "ru": "🔄 Включить"
+    },
+    "btn_disable_renewal": {
+        "uz": "⏹ O'chirish",
+        "ru": "⏹ Отключить"
+    },
+    "btn_auto_renewals": {
+        "uz": "🔄 Avtomatik yangilash",
+        "ru": "🔄 Автообновление"
+    },
+
+    # ==================== MOLIYA (FINANCE) ====================
+    "finance_report": {
+        "uz": "💰 <b>Moliyaviy hisobot</b> — {period}\n\n📈 Daromad: <b>{revenue:,} so'm</b>\n📉 Xarajat: <b>{expense:,} so'm</b>\n💵 Foyda: <b>{profit:,} so'm</b>\n📦 Buyurtmalar: <b>{orders}</b>\n🧾 O'rtacha chek: <b>{avg:,} so'm</b>",
+        "ru": "💰 <b>Финансовый отчёт</b> — {period}\n\n📈 Доход: <b>{revenue:,} сум</b>\n📉 Расход: <b>{expense:,} сум</b>\n💵 Прибыль: <b>{profit:,} сум</b>\n📦 Заказов: <b>{orders}</b>\n🧾 Средний чек: <b>{avg:,} сум</b>"
+    },
+    "btn_finance": {
+        "uz": "💰 Moliya",
+        "ru": "💰 Финансы"
+    },
+    "btn_finance_today": {
+        "uz": "📅 Bugun",
+        "ru": "📅 Сегодня"
+    },
+    "btn_finance_week": {
+        "uz": "📆 Hafta",
+        "ru": "📆 Неделя"
+    },
+    "btn_finance_month": {
+        "uz": "🗓 Oy",
+        "ru": "🗓 Месяц"
+    },
+    "btn_add_expense": {
+        "uz": "➕ Xarajat qo'shish",
+        "ru": "➕ Добавить расход"
+    },
+    "expense_enter_amount": {
+        "uz": "💸 Xarajat summasini kiriting (so'mda):",
+        "ru": "💸 Введите сумму расхода (в сумах):"
+    },
+    "expense_enter_description": {
+        "uz": "📝 Xarajat tavsifini kiriting:",
+        "ru": "📝 Введите описание расхода:"
+    },
+    "expense_added": {
+        "uz": "✅ Xarajat qo'shildi: {amount:,} so'm — {desc}",
+        "ru": "✅ Расход добавлен: {amount:,} сум — {desc}"
+    },
+
+    # ==================== PROMO KODI ====================
+    "promo_enter": {
+        "uz": "🎟 Promo-kodni kiriting:",
+        "ru": "🎟 Введите промокод:"
+    },
+    "promo_valid": {
+        "uz": "✅ Promo-kod qo'llandi: <b>{discount}% chegirma</b>",
+        "ru": "✅ Промокод применён: <b>скидка {discount}%</b>"
+    },
+    "promo_invalid": {
+        "uz": "❌ Promo-kod noto'g'ri yoki muddati tugagan.",
+        "ru": "❌ Промокод неверный или истёк."
+    },
+    "promo_list": {
+        "uz": "🎟 <b>Promo-kodlar</b>\n\n{items}",
+        "ru": "🎟 <b>Промокоды</b>\n\n{items}"
+    },
+    "promo_item": {
+        "uz": "• <code>{code}</code> — {discount}% | {used}/{limit} | {status}",
+        "ru": "• <code>{code}</code> — {discount}% | {used}/{limit} | {status}"
+    },
+    "promo_create_code": {
+        "uz": "Promo-kod nomini kiriting:",
+        "ru": "Введите название промокода:"
+    },
+    "promo_create_discount": {
+        "uz": "Chegirma foizini kiriting (1-100):",
+        "ru": "Введите процент скидки (1-100):"
+    },
+    "promo_create_limit": {
+        "uz": "Foydalanish limitini kiriting (0 = cheksiz):",
+        "ru": "Введите лимит использований (0 = без лимита):"
+    },
+    "promo_create_expiry": {
+        "uz": "Muddatini kiriting (YYYY-MM-DD) yoki /skip:",
+        "ru": "Введите срок действия (YYYY-MM-DD) или /skip:"
+    },
+    "promo_created": {
+        "uz": "✅ Promo-kod yaratildi: <code>{code}</code>",
+        "ru": "✅ Промокод создан: <code>{code}</code>"
+    },
+    "btn_create_promo": {
+        "uz": "➕ Yangi promo-kod",
+        "ru": "➕ Новый промокод"
+    },
+    "btn_promo_list": {
+        "uz": "📋 Promo-kodlar",
+        "ru": "📋 Промокоды"
+    },
+
+    # ==================== FLASH SALE ====================
+    "flash_sale_active": {
+        "uz": "⚡ <b>FLASH SALE!</b>\n\n{product} — <b>{discount}%</b> chegirma!\n⏳ {time_left} gacha",
+        "ru": "⚡ <b>FLASH SALE!</b>\n\n{product} — скидка <b>{discount}%</b>!\n⏳ До {time_left}"
+    },
+    "flash_sale_ended": {
+        "uz": "Flash sale tugadi.",
+        "ru": "Flash sale завершён."
+    },
+    "flash_sale_create_product": {
+        "uz": "Flash sale uchun mahsulotni tanlang:",
+        "ru": "Выберите товар для flash sale:"
+    },
+    "flash_sale_create_discount": {
+        "uz": "Chegirma foizini kiriting:",
+        "ru": "Введите процент скидки:"
+    },
+    "flash_sale_create_duration": {
+        "uz": "Davomiyligini soatlarda kiriting:",
+        "ru": "Введите длительность в часах:"
+    },
+    "flash_sale_created": {
+        "uz": "✅ Flash sale boshlandi! {discount}% chegirma {hours} soat davomida.",
+        "ru": "✅ Flash sale запущен! Скидка {discount}% на {hours} часов."
+    },
+    "btn_create_flash_sale": {
+        "uz": "⚡ Flash Sale",
+        "ru": "⚡ Flash Sale"
+    },
+
+    # ==================== BUNDLE ====================
+    "bundles_page": {
+        "uz": "📦 <b>To'plamlar</b>\n\nMaxsus narxdagi mahsulotlar to'plami:",
+        "ru": "📦 <b>Наборы</b>\n\nКомплекты товаров по специальной цене:"
+    },
+    "bundle_detail": {
+        "uz": "📦 <b>{name}</b>\n\n{description}\n\nTarkib: {items}\n\n💰 Umumiy narx: <s>{original:,}</s> <b>{price:,} so'm</b>\n📉 Tejash: {saving:,} so'm",
+        "ru": "📦 <b>{name}</b>\n\n{description}\n\nСостав: {items}\n\n💰 Итоговая цена: <s>{original:,}</s> <b>{price:,} сум</b>\n📉 Экономия: {saving:,} сум"
+    },
+    "bundle_empty": {
+        "uz": "📦 Hozircha to'plamlar yo'q.",
+        "ru": "📦 Наборов пока нет."
+    },
+    "bundle_added_to_cart": {
+        "uz": "✅ To'plam savatga qo'shildi!",
+        "ru": "✅ Набор добавлен в корзину!"
+    },
+    "btn_buy_bundle": {
+        "uz": "🛒 Savatga qo'shish",
+        "ru": "🛒 Добавить в корзину"
+    },
+    "btn_bundles": {
+        "uz": "📦 To'plamlar",
+        "ru": "📦 Наборы"
+    },
+    "bundle_create_name": {
+        "uz": "To'plam nomini kiriting:",
+        "ru": "Введите название набора:"
+    },
+    "bundle_create_desc": {
+        "uz": "Tavsifini kiriting:",
+        "ru": "Введите описание:"
+    },
+    "bundle_create_price": {
+        "uz": "To'plam narxini kiriting (so'mda):",
+        "ru": "Введите цену набора (в сумах):"
+    },
+    "bundle_created": {
+        "uz": "✅ To'plam yaratildi: {name}",
+        "ru": "✅ Набор создан: {name}"
+    },
+
+    # ==================== BROADCAST ====================
+    "broadcast_enter_text": {
+        "uz": "📢 Xabar matnini kiriting:\n(Rasmli xabar uchun rasm + matn yuboring)",
+        "ru": "📢 Введите текст сообщения:\n(Для сообщения с фото отправьте фото + текст)"
+    },
+    "broadcast_confirm": {
+        "uz": "📢 <b>Xabarni yuborishni tasdiqlang</b>\n\nFoydalanuvchilar soni: <b>{count}</b>\n\nPreview:",
+        "ru": "📢 <b>Подтвердите отправку</b>\n\nПользователей: <b>{count}</b>\n\nПревью:"
+    },
+    "broadcast_sending": {
+        "uz": "📤 Yuborilmoqda... {sent}/{total}",
+        "ru": "📤 Отправляется... {sent}/{total}"
+    },
+    "broadcast_done": {
+        "uz": "✅ Xabar yuborildi!\n✅ Muvaffaqiyat: {success}\n❌ Xato: {failed}",
+        "ru": "✅ Рассылка завершена!\n✅ Успешно: {success}\n❌ Ошибок: {failed}"
+    },
+    "btn_broadcast": {
+        "uz": "📢 Xabar yuborish",
+        "ru": "📢 Рассылка"
+    },
+    "btn_confirm_broadcast": {
+        "uz": "✅ Yuborish",
+        "ru": "✅ Отправить"
+    },
+
+    # ==================== KONTAKT / OPERATOR ====================
+    "contact_page": {
+        "uz": "💬 <b>Operator bilan bog'lanish</b>\n\nSavolingizni yozing, operator javob beradi.",
+        "ru": "💬 <b>Связь с оператором</b>\n\nНапишите ваш вопрос, оператор ответит."
+    },
+    "contact_enter_question": {
+        "uz": "✍️ Savolingizni yozing:",
+        "ru": "✍️ Напишите ваш вопрос:"
+    },
+    "contact_sent": {
+        "uz": "✅ Savolingiz yuborildi! Operator tez orada javob beradi.",
+        "ru": "✅ Ваш вопрос отправлен! Оператор ответит в ближайшее время."
+    },
+    "contact_new_message": {
+        "uz": "💬 <b>Yangi savol</b>\n\nFoydalanuvchi: {user} (ID: {user_id})\nTil: {lang}\n\nSavol:\n{question}",
+        "ru": "💬 <b>Новый вопрос</b>\n\nПользователь: {user} (ID: {user_id})\nЯзык: {lang}\n\nВопрос:\n{question}"
+    },
+    "contact_reply_prompt": {
+        "uz": "Javob yozing:",
+        "ru": "Напишите ответ:"
+    },
+    "contact_reply_sent": {
+        "uz": "✅ Javob yuborildi.",
+        "ru": "✅ Ответ отправлен."
+    },
+    "contact_operator_reply": {
+        "uz": "💬 <b>Operator javobi:</b>\n\n{reply}",
+        "ru": "💬 <b>Ответ оператора:</b>\n\n{reply}"
+    },
+    "btn_contact": {
+        "uz": "💬 Operator",
+        "ru": "💬 Оператор"
+    },
+    "btn_reply": {
+        "uz": "↩️ Javob berish",
+        "ru": "↩️ Ответить"
+    },
+
+    # ==================== MUDDATI ESLATMASI ====================
+    "expiry_3days": {
+        "uz": "⏰ <b>{product}</b> hisobingizning muddati 3 kunda tugaydi!\n📅 {expiry}\n\nYangilash uchun /start",
+        "ru": "⏰ Срок аккаунта <b>{product}</b> истекает через 3 дня!\n📅 {expiry}\n\nДля продления /start"
+    },
+    "expiry_1day": {
+        "uz": "🚨 <b>{product}</b> hisobingizning muddati ERTAGA tugaydi!\n📅 {expiry}",
+        "ru": "🚨 Срок аккаунта <b>{product}</b> истекает ЗАВТРА!\n📅 {expiry}"
+    },
+    "expiry_today": {
+        "uz": "🔴 <b>{product}</b> hisobingizning muddati BUGUN tugaydi!",
+        "ru": "🔴 Срок аккаунта <b>{product}</b> истекает СЕГОДНЯ!"
+    },
+
+    # ==================== CROSS-SELL ====================
+    "cross_sell": {
+        "uz": "💡 <b>{product}</b> sotib olganlar buni ham yoqtirishdi:\n\n{recommendations}",
+        "ru": "💡 Покупатели <b>{product}</b> также интересовались:\n\n{recommendations}"
+    },
+    "cross_sell_item": {
+        "uz": "• {name} — {price:,} so'm",
+        "ru": "• {name} — {price:,} сум"
+    },
+
+    # ==================== TARK ETILGAN SAVAT ====================
+    "abandoned_cart_reminder": {
+        "uz": "🛒 Savatchangizda {count} ta mahsulot qoldi!\n\nXaridni yakunlash uchun /start",
+        "ru": "🛒 В вашей корзине осталось {count} товаров!\n\nЗавершите покупку /start"
+    },
+
 }
 
 

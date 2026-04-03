@@ -235,4 +235,250 @@ def setup_scheduler(bot: "Bot") -> AsyncIOScheduler:
         kwargs={"bot": bot}
     )
 
+    # Har kuni 10:00 da muddati tugayotgan obunalar
+    scheduler.add_job(
+        task_check_expiring_subscriptions,
+        trigger=CronTrigger(hour=10, minute=0, timezone=TIMEZONE),
+        id="check_expiring",
+        name="Muddati tugayotgan obunalar",
+        replace_existing=True,
+        kwargs={"bot": bot}
+    )
+
+    # Har kuni 10:05 da avtomatik yangilash
+    scheduler.add_job(
+        task_check_auto_renewals,
+        trigger=CronTrigger(hour=10, minute=5, timezone=TIMEZONE),
+        id="check_auto_renewals",
+        name="Avtomatik yangilash",
+        replace_existing=True,
+        kwargs={"bot": bot}
+    )
+
+    # Har soatda tark etilgan savatlar
+    scheduler.add_job(
+        task_check_abandoned_carts,
+        trigger=IntervalTrigger(hours=1),
+        id="check_abandoned_carts",
+        name="Tark etilgan savatlar",
+        replace_existing=True,
+        kwargs={"bot": bot}
+    )
+
+    # Har kuni 12:00 da baho so'rash
+    scheduler.add_job(
+        task_request_reviews,
+        trigger=CronTrigger(hour=12, minute=0, timezone=TIMEZONE),
+        id="request_reviews",
+        name="Baho so'rash",
+        replace_existing=True,
+        kwargs={"bot": bot}
+    )
+
+    # Har kuni 14:00 da cross-sell
+    scheduler.add_job(
+        task_send_cross_sell,
+        trigger=CronTrigger(hour=14, minute=0, timezone=TIMEZONE),
+        id="send_cross_sell",
+        name="Cross-sell tavsiyalar",
+        replace_existing=True,
+        kwargs={"bot": bot}
+    )
+
+    # Har 5 daqiqada flash sale muddatini tekshirish
+    scheduler.add_job(
+        task_deactivate_flash_sales,
+        trigger=IntervalTrigger(minutes=5),
+        id="deactivate_flash_sales",
+        name="Flash sale tekshirish",
+        replace_existing=True,
+    )
+
+    # Har kuni 23:59 da moliyaviy kesh yangilash
+    scheduler.add_job(
+        task_update_finance_cache,
+        trigger=CronTrigger(hour=23, minute=59, timezone=TIMEZONE),
+        id="update_finance_cache",
+        name="Moliyaviy kesh yangilash",
+        replace_existing=True,
+    )
+
     return scheduler
+
+
+async def task_check_expiring_subscriptions(bot: "Bot") -> None:
+    """Har kuni 10:00 da muddati tugayotgan obunalarni tekshiradi."""
+    try:
+        from bot.utils.texts import t
+        from bot.db.models import get_expiring_order_items, mark_expiry_notified
+
+        for days, key in [(3, "expiry_3days"), (1, "expiry_1day"), (0, "expiry_today")]:
+            items = await get_expiring_order_items(days_left=days, notified_field=notified_field)
+            for item in items:
+                user_tid = item["user_telegram_id"]
+                lang = item.get("user_lang", item.get("lang", "uz"))
+                try:
+                    await bot.send_message(
+                        chat_id=user_tid,
+                        text=t(key, lang, product=item["product_name"], expiry=item["expires_at"]),
+                        parse_mode="HTML"
+                    )
+                    await mark_expiry_notified(item["id"], notified_field)
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.error(f"check_expiring_subscriptions xato: {e}")
+
+
+async def task_check_auto_renewals(bot: "Bot") -> None:
+    """Har kuni 10:00 da avtomatik yangilashlarni bajaradi."""
+    try:
+        from bot.utils.texts import t
+        from bot.db.models import (
+            get_due_auto_renewals, get_available_account,
+            sell_account, deactivate_auto_renewal
+        )
+        from datetime import date, timedelta
+
+        from datetime import date, timedelta
+        tomorrow_str = (date.today() + timedelta(days=1)).isoformat()
+        renewals = await get_due_auto_renewals(tomorrow_str)
+        for renewal in renewals:
+            lang = renewal.get("user_lang", "uz")
+            product_name = renewal.get("name_uz") if lang == "uz" else renewal.get("name_ru", renewal.get("name_uz","?"))
+            account = await get_available_account(renewal["product_id"], renewal["duration_tier"])
+            if account:
+                await sell_account(account["id"], renewal["user_telegram_id"], sold_via="auto_renewal")
+                tier_days = {"15_days": 15, "1_month": 30, "3_months": 90,
+                        "6_months": 180, "12_months": 365}.get(renewal["duration_tier"], 30)
+                expiry = (date.today() + timedelta(days=tier_days)).isoformat()
+                try:
+                    await bot.send_message(
+                        chat_id=renewal["user_telegram_id"],
+                        text=t("auto_renewal_executed", lang,
+                               product=product_name,
+                               login=account["login"],
+                               password=account["password"],
+                               expiry=expiry),
+                        parse_mode="HTML"
+                    )
+                except Exception:
+                    pass
+            else:
+                try:
+                    await bot.send_message(
+                        chat_id=renewal["user_telegram_id"],
+                        text=t("auto_renewal_failed", lang, product=product_name),
+                        parse_mode="HTML"
+                    )
+                    await deactivate_auto_renewal(renewal["id"])
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.error(f"check_auto_renewals xato: {e}")
+
+
+async def task_check_abandoned_carts(bot: "Bot") -> None:
+    """Har soatda tark etilgan savatlarni tekshiradi (10:00-21:00)."""
+    try:
+        now_hour = datetime.now().hour
+        if not (10 <= now_hour <= 21):
+            return
+
+        from bot.utils.texts import t
+        from bot.db.models import get_abandoned_cart_users, mark_cart_reminder_sent
+
+        users = await get_abandoned_cart_users(hours=2, sent_field="reminder_sent_2h")
+        for user in users:
+            try:
+                await bot.send_message(
+                    chat_id=user["telegram_id"],
+                    text=t("abandoned_cart_reminder", user.get("language", "uz"),
+                           count=user["item_count"]),
+                    parse_mode="HTML"
+                )
+                await mark_cart_reminder_sent(user["id"], "reminder_sent_2h")
+            except Exception:
+                pass
+    except Exception as e:
+        logger.error(f"check_abandoned_carts xato: {e}")
+
+
+async def task_request_reviews(bot: "Bot") -> None:
+    """Har kuni 12:00 da yetkazilgan buyurtmalar uchun baho so'rashi."""
+    try:
+        from bot.utils.texts import t
+        from bot.db.models import get_pending_reviews_to_request
+        from bot.handlers.review import make_review_keyboard
+
+        items = await get_pending_reviews_to_request()
+        for item in items:
+            lang = item.get("user_lang", item.get("lang", "uz"))
+            kb = make_review_keyboard(item["order_item_id"], lang)
+            try:
+                await bot.send_message(
+                    chat_id=item["user_telegram_id"],
+                    text=t("review_request", lang, product=item["product_name"]),
+                    reply_markup=kb,
+                    parse_mode="HTML"
+                )
+            except Exception:
+                pass
+    except Exception as e:
+        logger.error(f"request_reviews xato: {e}")
+
+
+async def task_send_cross_sell(bot: "Bot") -> None:
+    """Har kuni 14:00 da cross-sell tavsiyalar yuboradi."""
+    try:
+        from bot.utils.texts import t
+        from bot.db.models import get_cross_sell_targets, log_cross_sell
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+        targets = await get_cross_sell_targets()
+        for target in targets:
+            recs = target.get("recommendations", [])
+            if not recs:
+                continue
+            lang = target.get("lang", "uz")
+            items_text = "\n".join(
+                t("cross_sell_item", lang, name=r["name"], price=r["price"])
+                for r in recs[:3]
+            )
+            buttons = [
+                [InlineKeyboardButton(text=r["name"], callback_data=f"prod:{r['product_id']}")]
+                for r in recs[:3]
+            ]
+            kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+            try:
+                await bot.send_message(
+                    chat_id=target["telegram_id"],
+                    text=t("cross_sell", lang,
+                           product=target["last_product"],
+                           recommendations=items_text),
+                    reply_markup=kb,
+                    parse_mode="HTML"
+                )
+                await log_cross_sell(target["id"], [r["product_id"] for r in recs[:3]])
+            except Exception:
+                pass
+    except Exception as e:
+        logger.error(f"send_cross_sell xato: {e}")
+
+
+async def task_deactivate_flash_sales() -> None:
+    """Har 5 daqiqada flash sale muddatini tekshiradi."""
+    try:
+        from bot.db.models import deactivate_expired_flash_sales
+        await deactivate_expired_flash_sales()
+    except Exception as e:
+        logger.error(f"deactivate_flash_sales xato: {e}")
+
+
+async def task_update_finance_cache() -> None:
+    """Har kuni 23:59 da moliyaviy keshni yangilaydi."""
+    try:
+        from bot.db.models import update_finance_cache_today
+        await update_finance_cache_today()
+    except Exception as e:
+        logger.error(f"update_finance_cache xato: {e}")

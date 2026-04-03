@@ -1860,3 +1860,258 @@ async def get_all_user_telegram_ids() -> list[int]:
         cursor = await db.execute("SELECT telegram_id FROM users ORDER BY id")
         rows = await cursor.fetchall()
         return [r["telegram_id"] for r in rows]
+
+
+# ==================== ALIAS VA YETISHMAYOTGAN FUNKSIYALAR ====================
+
+async def get_replacement_by_id(replacement_id: int) -> Optional[dict]:
+    return await get_replacement(replacement_id)
+
+
+async def update_replacement_status(replacement_id: int, status: str,
+                                     new_account_id: Optional[int] = None) -> None:
+    note = f"new_account_id={new_account_id}" if new_account_id else None
+    await update_replacement(replacement_id, status, admin_note=note)
+
+
+async def get_all_operators() -> list[dict]:
+    """Barcha operator va managerlarni qaytaradi"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT u.telegram_id, u.lang, u.username
+            FROM admins a
+            JOIN users u ON u.telegram_id = a.telegram_id
+            WHERE a.role IN ('operator', 'manager', 'boss')
+        """)
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def get_user_total_spent(user_id: int) -> int:
+    """Foydalanuvchi jami xarid summasini qaytaradi (ichki id bilan)"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT COALESCE(SUM(o.total_amount), 0) as total
+            FROM orders o
+            WHERE o.user_id = ? AND o.status = 'delivered'
+        """, (user_id,))
+        row = await cursor.fetchone()
+        return int(row["total"]) if row else 0
+
+
+async def get_user_favorites(user_id: int) -> list[dict]:
+    """Foydalanuvchi sevimlilari (ichki id bilan)"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT f.product_id, p.name_uz as name,
+                   (SELECT COUNT(*) FROM accounts a
+                    WHERE a.product_id = f.product_id AND a.status = 'available') as stock
+            FROM favorites f
+            JOIN products p ON p.id = f.product_id
+            WHERE f.user_id = ?
+            ORDER BY f.created_at DESC
+        """, (user_id,))
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def add_to_favorites(user_id: int, product_id: int) -> None:
+    """Sevimlilarga qo'shish (ichki id)"""
+    async with get_db() as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO favorites (user_id, product_id) VALUES (?, ?)",
+            (user_id, product_id)
+        )
+        await db.commit()
+
+
+async def remove_from_favorites(user_id: int, product_id: int) -> None:
+    """Sevimlilardan o'chirish (ichki id)"""
+    async with get_db() as db:
+        await db.execute(
+            "DELETE FROM favorites WHERE user_id = ? AND product_id = ?",
+            (user_id, product_id)
+        )
+        await db.commit()
+
+
+async def is_in_favorites(user_id: int, product_id: int) -> bool:
+    """Sevimliligini tekshirish (ichki id)"""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT 1 FROM favorites WHERE user_id = ? AND product_id = ?",
+            (user_id, product_id)
+        )
+        return bool(await cursor.fetchone())
+
+
+async def add_stock_notify(user_id: int, product_id: int) -> None:
+    """Stok bildirishnomasi qo'shish (ichki id)"""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT telegram_id FROM users WHERE id = ?", (user_id,)
+        )
+        row = await cursor.fetchone()
+        if row:
+            await add_stock_notification(row["telegram_id"], product_id)
+
+
+async def get_order_item_by_id(order_item_id: int) -> Optional[dict]:
+    """Buyurtma elementini id bo'yicha qaytaradi"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT oi.*, p.name_uz as product_name, p.id as product_id
+            FROM order_items oi
+            JOIN products p ON p.id = oi.product_id
+            WHERE oi.id = ?
+        """, (order_item_id,))
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def get_referral_count(user_id: int) -> int:
+    """Foydalanuvchi taklif qilgan odamlar soni"""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT COUNT(*) as cnt FROM users WHERE referred_by = ?", (user_id,)
+        )
+        row = await cursor.fetchone()
+        return row["cnt"] if row else 0
+
+
+async def get_user_auto_renewals_by_id(user_id: int) -> list[dict]:
+    """Foydalanuvchi avtomatik yangilanishlarini qaytaradi (ichki id)"""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT telegram_id FROM users WHERE id = ?", (user_id,)
+        )
+        row = await cursor.fetchone()
+        if not row:
+            return []
+        return await get_user_auto_renewals(row["telegram_id"])
+
+
+async def delete_auto_renewal(renewal_id: int) -> None:
+    """Avtomatik yangilashni o'chiradi"""
+    async with get_db() as db:
+        await db.execute("DELETE FROM auto_renewals WHERE id = ?", (renewal_id,))
+        await db.commit()
+
+
+async def deactivate_auto_renewal(renewal_id: int) -> None:
+    """Avtomatik yangilashni o'chiradi (alias)"""
+    await delete_auto_renewal(renewal_id)
+
+
+async def get_available_account(product_id: int, tier: str) -> Optional[dict]:
+    """Mahsulot uchun mavjud akkauntni qaytaradi"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT * FROM accounts
+            WHERE product_id = ? AND duration_tier = ? AND status = 'available'
+            ORDER BY remaining_days ASC
+            LIMIT 1
+        """, (product_id, tier))
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def get_user_count() -> int:
+    """Jami foydalanuvchilar soni"""
+    async with get_db() as db:
+        cursor = await db.execute("SELECT COUNT(*) as cnt FROM users")
+        row = await cursor.fetchone()
+        return row["cnt"] if row else 0
+
+
+async def activate_promo_code(promo_id: int) -> None:
+    async with get_db() as db:
+        await db.execute("UPDATE promo_codes SET is_active = 1 WHERE id = ?", (promo_id,))
+        await db.commit()
+
+
+async def deactivate_promo_code(promo_id: int) -> None:
+    async with get_db() as db:
+        await db.execute("UPDATE promo_codes SET is_active = 0 WHERE id = ?", (promo_id,))
+        await db.commit()
+
+
+async def get_bundle_by_id(bundle_id: int) -> Optional[dict]:
+    async with get_db() as db:
+        cursor = await db.execute("SELECT * FROM bundles WHERE id = ?", (bundle_id,))
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def get_all_bundles() -> list[dict]:
+    return await get_active_bundles()
+
+
+async def get_all_products_flat() -> list[dict]:
+    """Barcha mahsulotlar va narx darajalari (flat list)"""
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT p.id as product_id, p.name_uz as name, pr.duration_tier as tier, pr.price
+            FROM products p
+            JOIN prices pr ON pr.product_id = p.id
+            WHERE p.is_active = 1
+            ORDER BY p.name_uz, pr.duration_tier
+        """)
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def get_cross_sell_targets() -> list[dict]:
+    """Cross-sell uchun foydalanuvchilar va tavsiyalar"""
+    async with get_db() as db:
+        # Users who bought something in last 7 days without recent cross-sell
+        cursor = await db.execute("""
+            SELECT DISTINCT u.id, u.telegram_id, u.lang,
+                   p.name_uz as last_product, p.id as last_product_id
+            FROM users u
+            JOIN orders o ON o.user_id = u.id
+            JOIN order_items oi ON oi.order_id = o.id
+            JOIN products p ON p.id = oi.product_id
+            WHERE o.status = 'delivered'
+              AND o.created_at >= datetime('now', '-7 days')
+              AND u.id NOT IN (
+                  SELECT DISTINCT user_id FROM cross_sell_log
+                  WHERE sent_at >= datetime('now', '-3 days')
+              )
+            LIMIT 100
+        """)
+        rows = await cursor.fetchall()
+        targets = []
+        for row in rows:
+            recs = await get_cross_sell_recommendations(row["last_product_id"], row["telegram_id"])
+            if recs:
+                t = dict(row)
+                t["recommendations"] = recs
+                targets.append(t)
+        return targets
+
+
+async def log_cross_sell(user_id: int, product_ids: list) -> None:
+    """Cross-sell logini yozadi (ichki id bilan)"""
+    async with get_db() as db:
+        for pid in product_ids:
+            await db.execute(
+                "INSERT OR IGNORE INTO cross_sell_log (user_id, product_id) VALUES (?, ?)",
+                (user_id, pid)
+            )
+        await db.commit()
+
+
+async def get_user_by_id(user_id: int) -> Optional[dict]:
+    """Foydalanuvchini ichki id bilan qaytaradi"""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT * FROM users WHERE id = ?", (user_id,)
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def get_user_by_telegram_id(telegram_id: int) -> Optional[dict]:
+    """get_user uchun alias"""
+    return await get_user(telegram_id)
