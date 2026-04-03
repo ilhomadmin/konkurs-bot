@@ -378,4 +378,42 @@ async def init_db() -> None:
                 ('platinum', 20, 12, '💎 Platinum', '💎 Платиновый', '💎')
         """)
 
+        # Cross-sell log
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS cross_sell_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                product_id INTEGER NOT NULL,
+                sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, product_id),
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (product_id) REFERENCES products(id)
+            )
+        """)
+
+        # Mavjud order_items jadvaliga yangi fieldlar qo'shish (migration)
+        for col, default in [
+            ("expiry_notified_3d", "0"),
+            ("expiry_notified_1d", "0"),
+            ("expiry_notified_0d", "0"),
+        ]:
+            try:
+                await db.execute(
+                    f"ALTER TABLE order_items ADD COLUMN {col} INTEGER DEFAULT {default}"
+                )
+            except Exception:
+                pass  # Allaqachon mavjud
+
+        # Mavjud cart_items jadvaliga yangi fieldlar
+        for col, default in [
+            ("reminder_sent_2h", "0"),
+            ("reminder_sent_24h", "0"),
+        ]:
+            try:
+                await db.execute(
+                    f"ALTER TABLE cart_items ADD COLUMN {col} INTEGER DEFAULT {default}"
+                )
+            except Exception:
+                pass
+
         await db.commit()
