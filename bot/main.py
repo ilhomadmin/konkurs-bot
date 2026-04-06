@@ -15,7 +15,7 @@ from bot.db.models import create_admin_role, get_admin_by_telegram_id
 from bot.config import ADMIN_IDS
 
 # Handlerlar
-from bot.handlers.admin.direct_sale import router as direct_sale_router  # DS /start avval
+from bot.handlers.admin.direct_sale import router as direct_sale_router
 from bot.handlers.start import router as start_router
 from bot.handlers.language import router as language_router
 from bot.handlers.catalog import router as catalog_router
@@ -29,6 +29,7 @@ from bot.handlers.admin.products import router as admin_products_router
 from bot.handlers.admin.accounts import router as admin_accounts_router
 from bot.handlers.admin.roles import router as admin_roles_router
 from bot.handlers.admin.orders import router as admin_orders_router
+from bot.handlers.admin.video_upload import router as video_upload_router
 
 # Phase 3 handlers
 from bot.handlers.replacement import router as replacement_router
@@ -45,6 +46,9 @@ from bot.handlers.admin.promo import router as admin_promo_router
 from bot.handlers.admin.flash_sale import router as admin_flash_sale_router
 from bot.handlers.admin.bundles import router as admin_bundles_router
 from bot.handlers.admin.broadcast import router as admin_broadcast_router
+
+# Middleware
+from bot.middlewares.maintenance import MaintenanceMiddleware
 
 # Scheduler
 from bot.scheduler.tasks import setup_scheduler
@@ -67,7 +71,7 @@ async def on_startup(bot: Bot) -> None:
         await create_admin_role(boss_id, role="boss")
         logger.info(f"Boss admin yaratildi: {boss_id}")
 
-    logger.info("Bot ishga tushdi! ✅")
+    logger.info("Bot ishga tushdi!")
 
 
 async def main() -> None:
@@ -77,28 +81,38 @@ async def main() -> None:
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
     )
 
+    # Eski webhook larni tozalash
+    await bot.delete_webhook(drop_pending_updates=True)
+    logger.info("Webhook tozalandi.")
+
     dp = Dispatcher(storage=MemoryStorage())
 
+    # Maintenance middleware
+    dp.message.middleware(MaintenanceMiddleware())
+    dp.callback_query.middleware(MaintenanceMiddleware())
+
     # Routerlar tartib muhim:
-    # 1. Direct sale deep link — /start DS_xxx (avval tekshiriladi)
+    # 1. Admin video upload (barcha videolarni tekshiradi)
+    dp.include_router(video_upload_router)
+    # 2. Direct sale deep link — /start DS_xxx
     dp.include_router(direct_sale_router)
-    # 2. Oddiy /start
+    # 3. Oddiy /start
     dp.include_router(start_router)
     dp.include_router(language_router)
-    # 3. Katalog, savat, buyurtma
+    # 4. Katalog, savat, buyurtma
     dp.include_router(catalog_router)
     dp.include_router(cart_router)
     dp.include_router(order_router)
     dp.include_router(payment_router)
     dp.include_router(my_orders_router)
     dp.include_router(faq_router)
-    # 4. Admin handlerlar
+    # 5. Admin handlerlar
     dp.include_router(admin_menu_router)
     dp.include_router(admin_products_router)
     dp.include_router(admin_accounts_router)
     dp.include_router(admin_roles_router)
     dp.include_router(admin_orders_router)
-    # Phase 3 user handlers
+    # 6. Phase 3 user handlers
     dp.include_router(replacement_router)
     dp.include_router(vip_router)
     dp.include_router(favorites_router)
@@ -107,7 +121,7 @@ async def main() -> None:
     dp.include_router(auto_renewal_router)
     dp.include_router(bundles_router)
     dp.include_router(contact_router)
-    # Phase 3 admin handlers
+    # 7. Phase 3 admin handlers
     dp.include_router(admin_replacement_router)
     dp.include_router(admin_finance_router)
     dp.include_router(admin_promo_router)
@@ -115,7 +129,7 @@ async def main() -> None:
     dp.include_router(admin_bundles_router)
     dp.include_router(admin_broadcast_router)
 
-    # Scheduler (bot instance bilan)
+    # Scheduler
     scheduler = setup_scheduler(bot)
     scheduler.start()
     logger.info("Scheduler ishga tushdi.")

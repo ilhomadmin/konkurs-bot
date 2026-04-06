@@ -1,5 +1,6 @@
 """
 Admin Direct Sale — akkauntlarni bevosita link orqali sotish
+YANGI STRUKTURA: tier yo'q, narx product da
 """
 import secrets
 import logging
@@ -10,13 +11,12 @@ from aiogram.filters.command import CommandObject
 
 from bot.db.models import (
     get_user, get_all_categories, get_products_by_category, get_product_by_id,
-    get_prices_by_product, get_available_count, get_next_available_account,
-    set_direct_sale_token, get_direct_sale_account, sell_account,
-    create_order, create_order_item, increment_purchase_count,
-    update_user_stats, update_order_status,
+    get_product_stock, sell_account, generate_direct_sale_token,
+    get_account_by_direct_sale_token,
+    create_order, add_order_item, increment_purchase_count,
+    increment_user_purchases, update_order_status,
 )
 from bot.utils.texts import t
-from bot.utils.duration import tier_display_name
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -36,7 +36,6 @@ async def get_lang_and_role(user_id: int) -> tuple[str, str | None]:
 
 @router.callback_query(F.data == "adm:ds")
 async def ds_start(callback: CallbackQuery) -> None:
-    """Direct sale — kategoriya tanlash"""
     try:
         lang, role = await get_lang_and_role(callback.from_user.id)
         if not role:
@@ -47,7 +46,7 @@ async def ds_start(callback: CallbackQuery) -> None:
         buttons = []
         for cat in categories:
             buttons.append([InlineKeyboardButton(
-                text=cat[f"name_{lang}"],
+                text=cat.get(f"name_{lang}", cat.get("name_uz", "?")),
                 callback_data=f"adm:ds:cat:{cat['id']}"
             )])
         buttons.append([InlineKeyboardButton(text=t("btn_back", lang), callback_data="adm:back")])
@@ -57,13 +56,13 @@ async def ds_start(callback: CallbackQuery) -> None:
             reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
         )
         await callback.answer()
-    except Exception:
+    except Exception as e:
+        logger.exception(f"ds_start error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("adm:ds:cat:"))
 async def ds_category(callback: CallbackQuery) -> None:
-    """Direct sale — mahsulot tanlash"""
     try:
         cat_id = int(callback.data.split(":")[3])
         lang, role = await get_lang_and_role(callback.from_user.id)
@@ -74,11 +73,10 @@ async def ds_category(callback: CallbackQuery) -> None:
         products = await get_products_by_category(cat_id, only_active=True)
         buttons = []
         for prod in products:
-            stats = await get_available_count(prod["id"])
-            available = stats.get("available", 0)
-            name = prod[f"name_{lang}"]
+            stock = await get_product_stock(prod["id"])
+            name = prod.get(f"name_{lang}", prod.get("name_uz", "?"))
             buttons.append([InlineKeyboardButton(
-                text=f"{name} ({available} ta)" if lang == "uz" else f"{name} ({available} шт)",
+                text=f"{name} — {prod['price']:,} ({stock} ta)",
                 callback_data=f"adm:ds:prod:{prod['id']}"
             )])
         buttons.append([InlineKeyboardButton(text=t("btn_back", lang), callback_data="adm:ds")])
@@ -88,13 +86,13 @@ async def ds_category(callback: CallbackQuery) -> None:
             reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
         )
         await callback.answer()
-    except Exception:
+    except Exception as e:
+        logger.exception(f"ds_category error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("adm:ds:prod:"))
-async def ds_product(callback: CallbackQuery) -> None:
-    """Direct sale — tier tanlash"""
+async def ds_product(callback: CallbackQuery, bot: Bot) -> None:
     try:
         product_id = int(callback.data.split(":")[3])
         lang, role = await get_lang_and_role(callback.from_user.id)
@@ -102,55 +100,9 @@ async def ds_product(callback: CallbackQuery) -> None:
             await callback.answer(t("access_denied", lang), show_alert=True)
             return
 
-        prices = await get_prices_by_product(product_id)
-        prod = await get_product_by_id(product_id)
-        cat_id = prod["category_id"] if prod else 0
-
-        buttons = []
-        for price in prices:
-            tier = price["duration_tier"]
-            tier_name = price[f"display_name_{lang}"]
-            stats = await get_available_count(product_id, tier)
-            available = stats.get("available", 0)
-            if available > 0:
-                buttons.append([InlineKeyboardButton(
-                    text=f"{tier_name} — {price['price']:,} ({available} ta)",
-                    callback_data=f"adm:ds:tier:{product_id}:{tier}"
-                )])
-
-        if not buttons:
-            await callback.answer(t("ds_no_accounts", lang), show_alert=True)
-            return
-
-        buttons.append([InlineKeyboardButton(
-            text=t("btn_back", lang),
-            callback_data=f"adm:ds:cat:{cat_id}"
-        )])
-
-        await callback.message.edit_text(
-            t("ask_tier_select", lang),
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
-        )
-        await callback.answer()
-    except Exception:
-        await callback.answer(t("error_general"), show_alert=True)
-
-
-@router.callback_query(F.data.startswith("adm:ds:tier:"))
-async def ds_show_account(callback: CallbackQuery, bot: Bot) -> None:
-    """Direct sale — akkaunt ko'rsatish va link generatsiya"""
-    try:
-        parts = callback.data.split(":")
-        product_id = int(parts[3])
-        tier = parts[4]
-
-        lang, role = await get_lang_and_role(callback.from_user.id)
-        if not role:
-            await callback.answer(t("access_denied", lang), show_alert=True)
-            return
-
-        await _show_ds_account(callback, bot, product_id, tier, lang)
-    except Exception:
+        await _show_ds_account(callback, bot, product_id, lang)
+    except Exception as e:
+        logger.exception(f"ds_product error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
@@ -158,35 +110,40 @@ async def _show_ds_account(
     callback: CallbackQuery,
     bot: Bot,
     product_id: int,
-    tier: str,
     lang: str
 ) -> None:
-    """Birinchi available akkauntni ko'rsatib token generatsiya qiladi"""
-    acc = await get_next_available_account(product_id, tier)
-    if not acc:
+    from bot.db.database import get_db
+
+    # Birinchi available akkauntni topish
+    async with get_db() as db:
+        cursor = await db.execute("""
+            SELECT * FROM accounts
+            WHERE product_id = ? AND status = 'available'
+            ORDER BY expiry_date ASC
+            LIMIT 1
+        """, (product_id,))
+        row = await cursor.fetchone()
+
+    if not row:
         await callback.answer(t("ds_no_accounts", lang), show_alert=True)
         return
 
-    # Token generatsiya va saqlash
-    token = secrets.token_urlsafe(6)
-    await set_direct_sale_token(acc["id"], token)
+    acc = dict(row)
 
-    # Bot username ni olish
+    # Token generatsiya
+    token = await generate_direct_sale_token(acc["id"])
+
     me = await bot.get_me()
     bot_username = me.username
     link = f"https://t.me/{bot_username}?start={DS_PREFIX}{token}"
 
-    # Mavjud sonni olish
-    stats = await get_available_count(product_id, tier)
-    available = stats.get("available", 0)
-
+    stock = await get_product_stock(product_id)
     prod = await get_product_by_id(product_id)
-    name = prod[f"name_{lang}"] if prod else "—"
-    tier_name = tier_display_name(tier, lang)
+    name = prod.get(f"name_{lang}", "—") if prod else "—"
 
     text = t("ds_account_info", lang,
-             name=name, tier=tier_name,
-             available=available,
+             name=name,
+             available=stock,
              acc_id=acc["id"],
              days=acc.get("remaining_days", 0),
              login=acc["login"],
@@ -197,12 +154,12 @@ async def _show_ds_account(
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text=t("btn_ds_sold", lang),
-                                 callback_data=f"adm:ds:sell:{acc['id']}:{product_id}:{tier}"),
+                                 callback_data=f"adm:ds:sell:{acc['id']}:{product_id}"),
             InlineKeyboardButton(text=t("btn_ds_next", lang),
-                                 callback_data=f"adm:ds:next:{product_id}:{tier}"),
+                                 callback_data=f"adm:ds:next:{product_id}"),
         ],
         [InlineKeyboardButton(text=t("btn_back", lang),
-                              callback_data=f"adm:ds:prod:{product_id}")],
+                              callback_data=f"adm:ds:cat:{prod.get('category_id', 0) if prod else 0}")],
     ])
 
     await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
@@ -211,25 +168,21 @@ async def _show_ds_account(
 
 @router.callback_query(F.data.startswith("adm:ds:sell:"))
 async def ds_manual_sell(callback: CallbackQuery, bot: Bot) -> None:
-    """Admin qo'lda akkauntni sotildi deb belgilaydi"""
     try:
         parts = callback.data.split(":")
         acc_id = int(parts[3])
         product_id = int(parts[4])
-        tier = parts[5]
 
         lang, role = await get_lang_and_role(callback.from_user.id)
         if not role:
             await callback.answer(t("access_denied", lang), show_alert=True)
             return
 
-        # Akkauntni sotilgan deb belgilash (user_id = None, manual sale)
         from bot.db.database import get_db
         async with get_db() as db:
             await db.execute("""
                 UPDATE accounts
-                SET status = 'sold',
-                    sold_at = CURRENT_TIMESTAMP,
+                SET status = 'sold', sold_at = CURRENT_TIMESTAMP,
                     sold_via = 'direct_sale_manual'
                 WHERE id = ? AND status = 'available'
             """, (acc_id,))
@@ -238,27 +191,23 @@ async def ds_manual_sell(callback: CallbackQuery, bot: Bot) -> None:
         await increment_purchase_count(product_id)
         await callback.answer(t("ds_sold_success", lang))
 
-        # Keyingi akkauntni ko'rsatish
-        await _show_ds_account(callback, bot, product_id, tier, lang)
-    except Exception:
+        await _show_ds_account(callback, bot, product_id, lang)
+    except Exception as e:
+        logger.exception(f"ds_manual_sell error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("adm:ds:next:"))
 async def ds_next_account(callback: CallbackQuery, bot: Bot) -> None:
-    """Keyingi akkauntni ko'rsatish"""
     try:
-        parts = callback.data.split(":")
-        product_id = int(parts[3])
-        tier = parts[4]
-
+        product_id = int(callback.data.split(":")[3])
         lang, role = await get_lang_and_role(callback.from_user.id)
         if not role:
             await callback.answer(t("access_denied", lang), show_alert=True)
             return
-
-        await _show_ds_account(callback, bot, product_id, tier, lang)
-    except Exception:
+        await _show_ds_account(callback, bot, product_id, lang)
+    except Exception as e:
+        logger.exception(f"ds_next_account error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
@@ -266,64 +215,57 @@ async def ds_next_account(callback: CallbackQuery, bot: Bot) -> None:
 
 @router.message(CommandStart(deep_link=True, deep_link_encoded=False))
 async def direct_sale_start(message: Message, command: CommandObject, bot: Bot) -> None:
-    """
-    /start DS_xxxxx — direct sale link orqali kelgan mijoz.
-    Token bo'yicha akkauntni topib, yetkazadi.
-    """
     try:
         arg = command.args or ""
         if not arg.startswith(DS_PREFIX):
-            return  # Oddiy /start — start.py handle qiladi
+            return
 
         token = arg[len(DS_PREFIX):]
 
-        # Foydalanuvchini yaratish yoki topish
         tg_user = message.from_user
         from bot.db.models import create_user
         user = await create_user(tg_user.id, tg_user.username, tg_user.full_name)
         lang = user.get("language", "uz") if user else "uz"
 
-        # Akkauntni topish
-        acc = await get_direct_sale_account(token)
-        if not acc:
+        acc = await get_account_by_direct_sale_token(token)
+        if not acc or acc.get("status") != "available":
             await message.answer(t("ds_link_expired", lang))
             return
 
         # Akkauntni sotish
-        await sell_account(acc["id"], tg_user.id, "direct_sale")
+        prod = await get_product_by_id(acc["product_id"])
+        unit_price = prod.get("price", 0) if prod else 0
+        cost_price = prod.get("cost_price", 0) if prod else 0
 
-        # Order va order_item yaratish (auto_delivered)
-        prices = await get_prices_by_product(acc["product_id"])
-        tier = acc.get("duration_tier")
-        price_info = next((p for p in prices if p["duration_tier"] == tier), None)
-        unit_price = price_info["price"] if price_info else 0
-        cost_price = price_info["cost_price"] if price_info else 0
+        # Sell the account
+        from bot.db.database import get_db
+        async with get_db() as db:
+            await db.execute("""
+                UPDATE accounts SET status = 'sold', sold_to_user_id = ?,
+                       sold_at = CURRENT_TIMESTAMP, sold_via = 'direct_sale'
+                WHERE id = ? AND status = 'available'
+            """, (tg_user.id, acc["id"]))
+            await db.commit()
 
+        # Order yaratish
         order_id = await create_order(
-            user_telegram_id=tg_user.id,
+            telegram_id=tg_user.id,
             total_amount=unit_price,
             discount_amount=0
         )
         await update_order_status(order_id, "auto_delivered")
-        item_id = await create_order_item(
+        await add_order_item(
             order_id=order_id,
             product_id=acc["product_id"],
             quantity=1,
-            duration_tier=tier or "",
             unit_price=unit_price,
             cost_price=cost_price
         )
-        from bot.db.models import update_order_item
-        await update_order_item(item_id,
-                                account_id=acc["id"],
-                                status="delivered",
-                                expiry_date=acc["expiry_date"])
 
         await increment_purchase_count(acc["product_id"])
-        await update_user_stats(tg_user.id, unit_price, 1)
+        await increment_user_purchases(tg_user.id, unit_price)
 
-        # Akkaunt ma'lumotlarini yuborish
-        name = acc[f"name_{lang}"]
+        name = prod.get(f"name_{lang}", "?") if prod else "?"
         text = t("ds_account_delivered", lang,
                  name=name,
                  login=acc["login"],
@@ -331,18 +273,19 @@ async def direct_sale_start(message: Message, command: CommandObject, bot: Bot) 
                  expiry=acc["expiry_date"])
         await message.answer(text, parse_mode="HTML")
 
-        # Instruksiya video
-        video_id = acc.get("product_video") or acc.get("category_video")
-        if video_id:
-            try:
-                await bot.send_video(
-                    chat_id=tg_user.id,
-                    video=video_id,
-                    caption="📹 Foydalanish instruksiyasi" if lang == "uz" else "📹 Инструкция"
-                )
-            except Exception:
-                pass
+        # Video instruksiya
+        if prod:
+            video_id = prod.get("instruction_video_file_id")
+            if video_id:
+                try:
+                    await bot.send_video(
+                        chat_id=tg_user.id,
+                        video=video_id,
+                        caption="📹 Foydalanish instruksiyasi" if lang == "uz" else "📹 Инструкция"
+                    )
+                except Exception:
+                    pass
 
     except Exception as e:
-        logger.error(f"Direct sale start xato: {e}")
+        logger.exception(f"direct_sale_start error: {e}")
         await message.answer(t("error_general"))

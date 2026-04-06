@@ -1,5 +1,6 @@
 """
 Scheduler vazifalari — APScheduler bilan
+YANGI STRUKTURA: duration_tier yo'q
 """
 import logging
 from datetime import datetime
@@ -10,475 +11,541 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from bot.config import TIMEZONE
-from bot.db.models import (
-    update_remaining_days, get_expired_pending_orders,
-    release_reserved_accounts, update_order_status,
-    get_low_stock_products, get_all_managers_and_bosses,
-    get_stock_notification_users, mark_stock_notified,
-    get_prices_by_product,
-)
+from bot.db.models import update_remaining_days
 
 if TYPE_CHECKING:
     from aiogram import Bot
 
 logger = logging.getLogger(__name__)
 
-# Stok bildirishnoma uchun oldingi holat (xotira)
-_prev_stock: dict[str, int] = {}
+_prev_stock: dict[int, int] = {}
 
 
 # ==================== VAZIFALAR ====================
 
 async def task_update_account_days() -> None:
-    """
-    Har kuni 06:00 da ishlaydigan vazifa.
-    Barcha available akkauntlar uchun remaining_days va tier yangilaydi.
-    Muddati o'tganlarni expired qiladi.
-    """
     try:
         updated = await update_remaining_days()
         logger.info(f"Akkaunt kunlari yangilandi: {updated} ta.")
     except Exception as e:
-        logger.error(f"update_remaining_days xato: {e}")
+        logger.exception(f"update_remaining_days xato: {e}")
 
 
 async def task_check_payment_timeout(bot: "Bot") -> None:
-    """
-    Har 5 daqiqada tekshirish.
-    To'lov muddati 30 daqiqadan o'tgan buyurtmalarni bekor qiladi.
-    """
     try:
-        expired_orders = await get_expired_pending_orders(timeout_minutes=30)
+        from bot.db.models import get_orders_by_status, release_reserved, update_order_status
+        from bot.utils.texts import t
+        from datetime import timedelta
 
-        for order in expired_orders:
+        try:
+            from bot.utils.settings import get_setting_int
+            timeout = await get_setting_int("payment_timeout_minutes", 30)
+        except Exception:
+            timeout = 30
+
+        orders = await get_orders_by_status("pending_payment", limit=100)
+        now = datetime.now()
+
+        for order in orders:
+            created = order.get("created_at", "")
+            if not created:
+                continue
+            try:
+                created_dt = datetime.fromisoformat(str(created))
+            except (ValueError, TypeError):
+                continue
+
+            if (now - created_dt).total_seconds() < timeout * 60:
+                continue
+
             order_id = order["id"]
-            user_telegram_id = order["user_telegram_id"]
-            lang = order.get("user_lang", "uz")
+            user_telegram_id = order.get("telegram_id")
 
-            # Akkauntlarni ozod qilish
-            await release_reserved_accounts(order_id)
+            await release_reserved(order_id)
             await update_order_status(order_id, "cancelled")
 
-            # Progress bar yangilash
-            progress_msg_id = order.get("progress_message_id")
-            if progress_msg_id:
+            if user_telegram_id:
+                progress_msg_id = order.get("progress_message_id")
+                if progress_msg_id:
+                    try:
+                        await bot.edit_message_text(
+                            chat_id=user_telegram_id,
+                            message_id=progress_msg_id,
+                            text=t("progress_cancelled", "uz")
+                        )
+                    except Exception:
+                        pass
                 try:
-                    from bot.utils.texts import t
-                    await bot.edit_message_text(
+                    from bot.db.models import get_user
+                    user = await get_user(user_telegram_id)
+                    lang = user.get("language", "uz") if user else "uz"
+                    await bot.send_message(
                         chat_id=user_telegram_id,
-                        message_id=progress_msg_id,
-                        text=t("progress_cancelled", lang)
+                        text=t("order_cancelled_timeout", lang, order_id=order_id)
                     )
                 except Exception:
                     pass
-
-            # Mijozga xabar
-            try:
-                from bot.utils.texts import t
-                await bot.send_message(
-                    chat_id=user_telegram_id,
-                    text=t("order_cancelled_timeout", lang, order_id=order_id)
-                )
-            except Exception:
-                pass
 
             logger.info(f"Buyurtma #{order_id} timeout bilan bekor qilindi.")
 
     except Exception as e:
-        logger.error(f"check_payment_timeout xato: {e}")
+        logger.exception(f"check_payment_timeout xato: {e}")
 
 
 async def task_check_stock_levels(bot: "Bot") -> None:
-    """
-    Har kuni 09:00 da tekshirish (smart timing: 10:00-21:00).
-    Kam qolgan stoklar uchun adminlarga ogohlantirish yuboradi.
-    Stok tiklangan mahsulotlar uchun kutayotgan mijozlarga xabar yuboradi.
-    """
     try:
         from bot.utils.texts import t
-        from bot.utils.duration import tier_display_name
+        from bot.db.database import get_db
+        from bot.db.models import get_user, get_product_by_id
 
-        # Smart timing tekshirish (UTC+5)
-        now_hour = datetime.now().hour
-        # Scheduler TIMEZONE bilan ishlaydi, qo'shimcha tekshirish shart emas
+        try:
+            from bot.utils.settings import get_setting_int
+            threshold = await get_setting_int("stock_alert_threshold", 3)
+        except Exception:
+            threshold = 3
 
-        # 1. Kam qolgan stoklar (3 va kam)
-        low_items = await get_low_stock_products(threshold=3)
+        # 1. Kam qolgan stoklar
+        async with get_db() as db:
+            cursor = await db.execute("""
+                SELECT a.product_id, COUNT(*) as cnt, p.name_uz
+                FROM accounts a
+                JOIN products p ON p.id = a.product_id
+                WHERE a.status = 'available'
+                GROUP BY a.product_id
+                HAVING cnt <= ? AND cnt > 0
+            """, (threshold,))
+            low_items = [dict(r) for r in await cursor.fetchall()]
+
         if low_items:
-            admin_ids = await get_all_managers_and_bosses()
+            from bot.db.models import get_all_admins
+            admins = await get_all_admins()
+            admin_ids = [a["telegram_id"] for a in admins if a.get("role") in ("manager", "boss")]
 
-            item_lines = []
-            for item in low_items:
-                tier_name = tier_display_name(item["duration_tier"], "uz")
-                item_lines.append(
-                    t("low_stock_item", "uz",
-                      name=item["name_uz"],
-                      tier=tier_name,
-                      cnt=item["cnt"])
-                )
+            item_lines = [f"• {item['name_uz']}: {item['cnt']} ta" for item in low_items]
+            msg = t("low_stock_admin", "uz", items="\n".join(item_lines))
 
-            if item_lines:
-                msg = t("low_stock_admin", "uz", items="\n".join(item_lines))
-                for admin_id in admin_ids:
+            for admin_id in admin_ids:
+                try:
+                    await bot.send_message(chat_id=admin_id, text=msg, parse_mode="HTML")
+                except Exception:
+                    pass
+
+        # 2. Stok tiklangan mahsulotlar
+        global _prev_stock
+        async with get_db() as db:
+            cursor = await db.execute("""
+                SELECT a.product_id, COUNT(*) as cnt
+                FROM accounts a WHERE a.status = 'available'
+                GROUP BY a.product_id
+            """)
+            rows = [dict(r) for r in await cursor.fetchall()]
+            current_stock = {r["product_id"]: r["cnt"] for r in rows}
+
+        for pid, cnt in current_stock.items():
+            prev_cnt = _prev_stock.get(pid, 0)
+            if prev_cnt == 0 and cnt > 0:
+                from bot.db.models import get_stock_notifications, mark_notified
+                notify_users = await get_stock_notifications(pid)
+                prod = await get_product_by_id(pid)
+                if not prod:
+                    continue
+
+                for nu in notify_users:
+                    user_tid = nu.get("telegram_id") or nu.get("user_id")
+                    if not user_tid:
+                        continue
+                    user = await get_user(user_tid)
+                    lang = user.get("language", "uz") if user else "uz"
+                    name = prod.get(f"name_{lang}", prod.get("name_uz", "?"))
+
+                    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+                    kb = InlineKeyboardMarkup(inline_keyboard=[[
+                        InlineKeyboardButton(
+                            text=t("btn_buy_now", lang),
+                            callback_data=f"addcart:{pid}"
+                        )
+                    ]])
                     try:
                         await bot.send_message(
-                            chat_id=admin_id,
-                            text=msg,
-                            parse_mode="HTML"
+                            chat_id=user_tid,
+                            text=t("stock_restored_notify", lang, name=name, price=prod.get("price", 0)),
+                            reply_markup=kb, parse_mode="HTML"
                         )
                     except Exception:
                         pass
 
-        # 2. Stok tiklangan mahsulotlar uchun mijozlarga xabar
-        global _prev_stock
-        from bot.db.database import get_db
-        async with get_db() as db:
-            cursor = await db.execute("""
-                SELECT a.product_id, a.duration_tier, COUNT(*) as cnt,
-                       p.name_uz, p.name_ru
-                FROM accounts a
-                JOIN products p ON p.id = a.product_id
-                WHERE a.status = 'available'
-                GROUP BY a.product_id, a.duration_tier
-            """)
-            rows = await cursor.fetchall()
-            current_stock = {f"{r['product_id']}:{r['duration_tier']}": r["cnt"] for r in rows}
-
-        for key, cnt in current_stock.items():
-            prev_cnt = _prev_stock.get(key, 0)
-            if prev_cnt == 0 and cnt > 0:
-                # Stok tiklandi — bildirishnoma yuborish
-                product_id, tier = key.split(":", 1)
-                product_id = int(product_id)
-
-                notify_users = await get_stock_notification_users(product_id)
-                if notify_users:
-                    prices = await get_prices_by_product(product_id)
-                    price_info = next((p for p in prices if p["duration_tier"] == tier), None)
-                    price_val = price_info["price"] if price_info else 0
-
-                    for user_tid in notify_users:
-                        from bot.db.models import get_user
-                        user = await get_user(user_tid)
-                        lang = user.get("language", "uz") if user else "uz"
-                        name = (await _get_product_name(product_id, lang))
-                        tier_name = tier_display_name(tier, lang)
-
-                        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-                        kb = InlineKeyboardMarkup(inline_keyboard=[[
-                            InlineKeyboardButton(
-                                text=t("btn_buy_now", lang),
-                                callback_data=f"tier:{product_id}:{tier}"
-                            )
-                        ]])
-                        try:
-                            await bot.send_message(
-                                chat_id=user_tid,
-                                text=t("stock_restored_notify", lang,
-                                       name=name, tier=tier_name, price=price_val),
-                                reply_markup=kb,
-                                parse_mode="HTML"
-                            )
-                        except Exception:
-                            pass
-
-                    await mark_stock_notified(product_id)
+                    await mark_notified(user_tid, pid)
 
         _prev_stock = current_stock
 
     except Exception as e:
-        logger.error(f"check_stock_levels xato: {e}")
+        logger.exception(f"check_stock_levels xato: {e}")
 
 
 async def _get_product_name(product_id: int, lang: str) -> str:
-    """Mahsulot nomini qaytaradi"""
     from bot.db.models import get_product_by_id
     prod = await get_product_by_id(product_id)
     if not prod:
         return f"#{product_id}"
-    return prod[f"name_{lang}"]
-
-
-# ==================== SCHEDULER SOZLASH ====================
-
-def setup_scheduler(bot: "Bot") -> AsyncIOScheduler:
-    """Schedulerni sozlaydi va qaytaradi"""
-    scheduler = AsyncIOScheduler(timezone=TIMEZONE)
-
-    # Har kuni 06:00 da akkaunt kunlarini yangilash
-    scheduler.add_job(
-        task_update_account_days,
-        trigger=CronTrigger(hour=6, minute=0, timezone=TIMEZONE),
-        id="update_account_days",
-        name="Akkaunt kunlarini yangilash",
-        replace_existing=True,
-        misfire_grace_time=3600
-    )
-
-    # Har 5 daqiqada payment timeout tekshirish
-    scheduler.add_job(
-        task_check_payment_timeout,
-        trigger=IntervalTrigger(minutes=5),
-        id="check_payment_timeout",
-        name="To'lov timeout tekshirish",
-        replace_existing=True,
-        kwargs={"bot": bot}
-    )
-
-    # Har kuni 09:00 da stok tekshirish (smart timing)
-    scheduler.add_job(
-        task_check_stock_levels,
-        trigger=CronTrigger(hour=9, minute=0, timezone=TIMEZONE),
-        id="check_stock_levels",
-        name="Stok tekshirish va ogohlantirish",
-        replace_existing=True,
-        kwargs={"bot": bot}
-    )
-
-    # Har kuni 10:00 da muddati tugayotgan obunalar
-    scheduler.add_job(
-        task_check_expiring_subscriptions,
-        trigger=CronTrigger(hour=10, minute=0, timezone=TIMEZONE),
-        id="check_expiring",
-        name="Muddati tugayotgan obunalar",
-        replace_existing=True,
-        kwargs={"bot": bot}
-    )
-
-    # Har kuni 10:05 da avtomatik yangilash
-    scheduler.add_job(
-        task_check_auto_renewals,
-        trigger=CronTrigger(hour=10, minute=5, timezone=TIMEZONE),
-        id="check_auto_renewals",
-        name="Avtomatik yangilash",
-        replace_existing=True,
-        kwargs={"bot": bot}
-    )
-
-    # Har soatda tark etilgan savatlar
-    scheduler.add_job(
-        task_check_abandoned_carts,
-        trigger=IntervalTrigger(hours=1),
-        id="check_abandoned_carts",
-        name="Tark etilgan savatlar",
-        replace_existing=True,
-        kwargs={"bot": bot}
-    )
-
-    # Har kuni 12:00 da baho so'rash
-    scheduler.add_job(
-        task_request_reviews,
-        trigger=CronTrigger(hour=12, minute=0, timezone=TIMEZONE),
-        id="request_reviews",
-        name="Baho so'rash",
-        replace_existing=True,
-        kwargs={"bot": bot}
-    )
-
-    # Har kuni 14:00 da cross-sell
-    scheduler.add_job(
-        task_send_cross_sell,
-        trigger=CronTrigger(hour=14, minute=0, timezone=TIMEZONE),
-        id="send_cross_sell",
-        name="Cross-sell tavsiyalar",
-        replace_existing=True,
-        kwargs={"bot": bot}
-    )
-
-    # Har 5 daqiqada flash sale muddatini tekshirish
-    scheduler.add_job(
-        task_deactivate_flash_sales,
-        trigger=IntervalTrigger(minutes=5),
-        id="deactivate_flash_sales",
-        name="Flash sale tekshirish",
-        replace_existing=True,
-    )
-
-    # Har kuni 23:59 da moliyaviy kesh yangilash
-    scheduler.add_job(
-        task_update_finance_cache,
-        trigger=CronTrigger(hour=23, minute=59, timezone=TIMEZONE),
-        id="update_finance_cache",
-        name="Moliyaviy kesh yangilash",
-        replace_existing=True,
-    )
-
-    return scheduler
+    return prod.get(f"name_{lang}", prod.get("name_uz", "?"))
 
 
 async def task_check_expiring_subscriptions(bot: "Bot") -> None:
-    """Har kuni 10:00 da muddati tugayotgan obunalarni tekshiradi."""
     try:
         from bot.utils.texts import t
-        from bot.db.models import get_expiring_order_items, mark_expiry_notified
+        from bot.db.database import get_db
+        from bot.db.models import get_user
+        from datetime import date, timedelta
 
-        for days, key in [(3, "expiry_3days"), (1, "expiry_1day"), (0, "expiry_today")]:
-            items = await get_expiring_order_items(days_left=days, notified_field=notified_field)
+        today = date.today()
+        checks = [
+            (3, "expiry_notified_3d", "expiry_3days"),
+            (1, "expiry_notified_1d", "expiry_1day"),
+            (0, "expiry_notified_0d", "expiry_today"),
+        ]
+
+        for days_left, notified_col, text_key in checks:
+            target_date = (today + timedelta(days=days_left)).isoformat()
+            async with get_db() as db:
+                cursor = await db.execute(f"""
+                    SELECT oi.id, oi.expiry_date, oi.product_id,
+                           o.user_id, u.telegram_id, u.language,
+                           p.name_uz, p.name_ru
+                    FROM order_items oi
+                    JOIN orders o ON o.id = oi.order_id
+                    JOIN users u ON u.id = o.user_id
+                    JOIN products p ON p.id = oi.product_id
+                    WHERE oi.expiry_date = ? AND oi.status = 'delivered'
+                          AND oi.{notified_col} = 0
+                """, (target_date,))
+                items = [dict(r) for r in await cursor.fetchall()]
+
             for item in items:
-                user_tid = item["user_telegram_id"]
-                lang = item.get("user_lang", item.get("lang", "uz"))
+                lang = item.get("language", "uz")
+                name = item.get(f"name_{lang}", item.get("name_uz", "?"))
                 try:
                     await bot.send_message(
-                        chat_id=user_tid,
-                        text=t(key, lang, product=item["product_name"], expiry=item["expires_at"]),
+                        chat_id=item["telegram_id"],
+                        text=t(text_key, lang, product=name, expiry=item["expiry_date"]),
                         parse_mode="HTML"
                     )
-                    await mark_expiry_notified(item["id"], notified_field)
                 except Exception:
                     pass
+
+                async with get_db() as db:
+                    await db.execute(
+                        f"UPDATE order_items SET {notified_col} = 1 WHERE id = ?",
+                        (item["id"],)
+                    )
+                    await db.commit()
+
     except Exception as e:
-        logger.error(f"check_expiring_subscriptions xato: {e}")
+        logger.exception(f"check_expiring_subscriptions xato: {e}")
 
 
 async def task_check_auto_renewals(bot: "Bot") -> None:
-    """Har kuni 10:00 da avtomatik yangilashlarni bajaradi."""
     try:
         from bot.utils.texts import t
         from bot.db.models import (
-            get_due_auto_renewals, get_available_account,
-            sell_account, deactivate_auto_renewal
+            get_due_auto_renewals, sell_account, get_product_by_id,
+            update_auto_renewal_status, get_user,
         )
         from datetime import date, timedelta
 
-        from datetime import date, timedelta
-        tomorrow_str = (date.today() + timedelta(days=1)).isoformat()
-        renewals = await get_due_auto_renewals(tomorrow_str)
+        renewals = await get_due_auto_renewals()
         for renewal in renewals:
-            lang = renewal.get("user_lang", "uz")
-            product_name = renewal.get("name_uz") if lang == "uz" else renewal.get("name_ru", renewal.get("name_uz","?"))
-            account = await get_available_account(renewal["product_id"], renewal["duration_tier"])
+            user_tid = renewal.get("telegram_id") or renewal.get("user_telegram_id")
+            if not user_tid:
+                continue
+            user = await get_user(user_tid)
+            lang = user.get("language", "uz") if user else "uz"
+            prod = await get_product_by_id(renewal["product_id"])
+            product_name = prod.get(f"name_{lang}", "?") if prod else "?"
+
+            account = await sell_account(renewal["product_id"], 0, user_tid)
             if account:
-                await sell_account(account["id"], renewal["user_telegram_id"], sold_via="auto_renewal")
-                tier_days = {"15_days": 15, "1_month": 30, "3_months": 90,
-                        "6_months": 180, "12_months": 365}.get(renewal["duration_tier"], 30)
-                expiry = (date.today() + timedelta(days=tier_days)).isoformat()
                 try:
                     await bot.send_message(
-                        chat_id=renewal["user_telegram_id"],
+                        chat_id=user_tid,
                         text=t("auto_renewal_executed", lang,
                                product=product_name,
                                login=account["login"],
                                password=account["password"],
-                               expiry=expiry),
+                               expiry=account.get("expiry_date", "—")),
                         parse_mode="HTML"
                     )
                 except Exception:
                     pass
+                # Update next renewal date (30 days default)
+                next_date = (date.today() + timedelta(days=30)).isoformat()
+                await update_auto_renewal_status(renewal["id"], "active", next_date)
             else:
                 try:
                     await bot.send_message(
-                        chat_id=renewal["user_telegram_id"],
+                        chat_id=user_tid,
                         text=t("auto_renewal_failed", lang, product=product_name),
                         parse_mode="HTML"
                     )
-                    await deactivate_auto_renewal(renewal["id"])
                 except Exception:
                     pass
+                await update_auto_renewal_status(renewal["id"], "failed")
+
     except Exception as e:
-        logger.error(f"check_auto_renewals xato: {e}")
+        logger.exception(f"check_auto_renewals xato: {e}")
 
 
 async def task_check_abandoned_carts(bot: "Bot") -> None:
-    """Har soatda tark etilgan savatlarni tekshiradi (10:00-21:00)."""
     try:
         now_hour = datetime.now().hour
         if not (10 <= now_hour <= 21):
             return
 
         from bot.utils.texts import t
-        from bot.db.models import get_abandoned_cart_users, mark_cart_reminder_sent
+        from bot.db.database import get_db
+        from datetime import timedelta
 
-        users = await get_abandoned_cart_users(hours=2, sent_field="reminder_sent_2h")
-        for user in users:
+        now = datetime.now()
+
+        # 2 soatlik eslatma
+        cutoff_2h = (now - timedelta(hours=2)).isoformat()
+        async with get_db() as db:
+            cursor = await db.execute("""
+                SELECT u.telegram_id, u.language, COUNT(*) as item_count, ci.id as cart_item_id
+                FROM cart_items ci
+                JOIN users u ON u.id = ci.user_id
+                WHERE ci.added_at <= ? AND ci.reminder_sent_2h = 0
+                GROUP BY u.id
+            """, (cutoff_2h,))
+            users_2h = [dict(r) for r in await cursor.fetchall()]
+
+        for u in users_2h:
             try:
                 await bot.send_message(
-                    chat_id=user["telegram_id"],
-                    text=t("abandoned_cart_reminder", user.get("language", "uz"),
-                           count=user["item_count"]),
+                    chat_id=u["telegram_id"],
+                    text=t("abandoned_cart_reminder", u.get("language", "uz"), count=u["item_count"]),
                     parse_mode="HTML"
                 )
-                await mark_cart_reminder_sent(user["id"], "reminder_sent_2h")
             except Exception:
                 pass
+            async with get_db() as db:
+                await db.execute("""
+                    UPDATE cart_items SET reminder_sent_2h = 1
+                    WHERE user_id = (SELECT id FROM users WHERE telegram_id = ?)
+                """, (u["telegram_id"],))
+                await db.commit()
+
     except Exception as e:
-        logger.error(f"check_abandoned_carts xato: {e}")
+        logger.exception(f"check_abandoned_carts xato: {e}")
 
 
 async def task_request_reviews(bot: "Bot") -> None:
-    """Har kuni 12:00 da yetkazilgan buyurtmalar uchun baho so'rashi."""
     try:
         from bot.utils.texts import t
-        from bot.db.models import get_pending_reviews_to_request
-        from bot.handlers.review import make_review_keyboard
+        from bot.db.database import get_db
+        from bot.db.models import get_user
+        from datetime import timedelta
 
-        items = await get_pending_reviews_to_request()
+        cutoff = (datetime.now() - timedelta(days=3)).isoformat()
+
+        async with get_db() as db:
+            cursor = await db.execute("""
+                SELECT oi.id as order_item_id, oi.product_id,
+                       o.user_id, u.telegram_id, u.language,
+                       p.name_uz, p.name_ru
+                FROM order_items oi
+                JOIN orders o ON o.id = oi.order_id
+                JOIN users u ON u.id = o.user_id
+                JOIN products p ON p.id = oi.product_id
+                WHERE oi.status = 'delivered' AND oi.delivered_at <= ?
+                AND NOT EXISTS (
+                    SELECT 1 FROM reviews r WHERE r.order_item_id = oi.id
+                )
+                LIMIT 50
+            """, (cutoff,))
+            items = [dict(r) for r in await cursor.fetchall()]
+
         for item in items:
-            lang = item.get("user_lang", item.get("lang", "uz"))
-            kb = make_review_keyboard(item["order_item_id"], lang)
+            lang = item.get("language", "uz")
+            name = item.get(f"name_{lang}", item.get("name_uz", "?"))
+            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text=f"{'⭐' * i}", callback_data=f"rev:{item['order_item_id']}:{i}")
+                 for i in range(1, 6)]
+            ])
             try:
                 await bot.send_message(
-                    chat_id=item["user_telegram_id"],
-                    text=t("review_request", lang, product=item["product_name"]),
-                    reply_markup=kb,
-                    parse_mode="HTML"
+                    chat_id=item["telegram_id"],
+                    text=t("review_request", lang, product=name),
+                    reply_markup=kb, parse_mode="HTML"
                 )
             except Exception:
                 pass
+
     except Exception as e:
-        logger.error(f"request_reviews xato: {e}")
+        logger.exception(f"request_reviews xato: {e}")
 
 
 async def task_send_cross_sell(bot: "Bot") -> None:
-    """Har kuni 14:00 da cross-sell tavsiyalar yuboradi."""
     try:
         from bot.utils.texts import t
-        from bot.db.models import get_cross_sell_targets, log_cross_sell
+        from bot.db.database import get_db
+        from bot.db.models import get_user, log_cross_sell
         from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        from datetime import timedelta
 
-        targets = await get_cross_sell_targets()
-        for target in targets:
-            recs = target.get("recommendations", [])
+        cutoff = (datetime.now() - timedelta(days=1)).isoformat()
+
+        async with get_db() as db:
+            # Users who bought something recently
+            cursor = await db.execute("""
+                SELECT DISTINCT u.telegram_id, u.language, u.id as user_id
+                FROM orders o
+                JOIN users u ON u.id = o.user_id
+                WHERE o.status = 'confirmed' AND o.updated_at >= ?
+                LIMIT 50
+            """, (cutoff,))
+            buyers = [dict(r) for r in await cursor.fetchall()]
+
+        for buyer in buyers:
+            lang = buyer.get("language", "uz")
+            async with get_db() as db:
+                cursor = await db.execute("""
+                    SELECT p.id, p.name_uz, p.name_ru, p.price
+                    FROM products p
+                    WHERE p.is_active = 1
+                    AND p.id NOT IN (
+                        SELECT oi.product_id FROM order_items oi
+                        JOIN orders o ON o.id = oi.order_id
+                        WHERE o.user_id = ?
+                    )
+                    AND p.id NOT IN (
+                        SELECT product_id FROM cross_sell_log WHERE user_id = ?
+                    )
+                    ORDER BY p.purchase_count DESC
+                    LIMIT 3
+                """, (buyer["user_id"], buyer["user_id"]))
+                recs = [dict(r) for r in await cursor.fetchall()]
+
             if not recs:
                 continue
-            lang = target.get("lang", "uz")
-            items_text = "\n".join(
-                t("cross_sell_item", lang, name=r["name"], price=r["price"])
-                for r in recs[:3]
-            )
-            buttons = [
-                [InlineKeyboardButton(text=r["name"], callback_data=f"prod:{r['product_id']}")]
-                for r in recs[:3]
-            ]
+
+            buttons = []
+            for r in recs:
+                name = r.get(f"name_{lang}", r.get("name_uz", "?"))
+                buttons.append([InlineKeyboardButton(
+                    text=f"{name} — {r['price']:,} so'm",
+                    callback_data=f"addcart:{r['id']}"
+                )])
+
             kb = InlineKeyboardMarkup(inline_keyboard=buttons)
             try:
                 await bot.send_message(
-                    chat_id=target["telegram_id"],
-                    text=t("cross_sell", lang,
-                           product=target["last_product"],
-                           recommendations=items_text),
-                    reply_markup=kb,
-                    parse_mode="HTML"
+                    chat_id=buyer["telegram_id"],
+                    text=t("cross_sell", lang),
+                    reply_markup=kb, parse_mode="HTML"
                 )
-                await log_cross_sell(target["id"], [r["product_id"] for r in recs[:3]])
+                for r in recs:
+                    await log_cross_sell(buyer["telegram_id"], r["id"])
             except Exception:
                 pass
+
     except Exception as e:
-        logger.error(f"send_cross_sell xato: {e}")
+        logger.exception(f"send_cross_sell xato: {e}")
 
 
 async def task_deactivate_flash_sales() -> None:
-    """Har 5 daqiqada flash sale muddatini tekshiradi."""
     try:
-        from bot.db.models import deactivate_expired_flash_sales
-        await deactivate_expired_flash_sales()
+        from bot.db.database import get_db
+        now = datetime.now().isoformat()
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE flash_sales SET is_active = 0 WHERE ends_at <= ? AND is_active = 1",
+                (now,)
+            )
+            await db.commit()
     except Exception as e:
-        logger.error(f"deactivate_flash_sales xato: {e}")
+        logger.exception(f"deactivate_flash_sales xato: {e}")
 
 
 async def task_update_finance_cache() -> None:
-    """Har kuni 23:59 da moliyaviy keshni yangilaydi."""
     try:
-        from bot.db.models import update_finance_cache_today
-        await update_finance_cache_today()
+        from bot.db.models import update_daily_finance_cache
+        from datetime import date
+        await update_daily_finance_cache(date.today().isoformat())
     except Exception as e:
-        logger.error(f"update_finance_cache xato: {e}")
+        logger.exception(f"update_finance_cache xato: {e}")
+
+
+# ==================== SCHEDULER SOZLASH ====================
+
+def setup_scheduler(bot: "Bot") -> AsyncIOScheduler:
+    scheduler = AsyncIOScheduler(timezone=TIMEZONE)
+
+    scheduler.add_job(
+        task_update_account_days,
+        trigger=CronTrigger(hour=6, minute=0, timezone=TIMEZONE),
+        id="update_account_days", replace_existing=True, misfire_grace_time=3600
+    )
+
+    scheduler.add_job(
+        task_check_payment_timeout,
+        trigger=IntervalTrigger(minutes=5),
+        id="check_payment_timeout", replace_existing=True,
+        kwargs={"bot": bot}
+    )
+
+    scheduler.add_job(
+        task_check_stock_levels,
+        trigger=CronTrigger(hour=9, minute=0, timezone=TIMEZONE),
+        id="check_stock_levels", replace_existing=True,
+        kwargs={"bot": bot}
+    )
+
+    scheduler.add_job(
+        task_check_expiring_subscriptions,
+        trigger=CronTrigger(hour=10, minute=0, timezone=TIMEZONE),
+        id="check_expiring", replace_existing=True,
+        kwargs={"bot": bot}
+    )
+
+    scheduler.add_job(
+        task_check_auto_renewals,
+        trigger=CronTrigger(hour=10, minute=5, timezone=TIMEZONE),
+        id="check_auto_renewals", replace_existing=True,
+        kwargs={"bot": bot}
+    )
+
+    scheduler.add_job(
+        task_check_abandoned_carts,
+        trigger=IntervalTrigger(hours=1),
+        id="check_abandoned_carts", replace_existing=True,
+        kwargs={"bot": bot}
+    )
+
+    scheduler.add_job(
+        task_request_reviews,
+        trigger=CronTrigger(hour=12, minute=0, timezone=TIMEZONE),
+        id="request_reviews", replace_existing=True,
+        kwargs={"bot": bot}
+    )
+
+    scheduler.add_job(
+        task_send_cross_sell,
+        trigger=CronTrigger(hour=14, minute=0, timezone=TIMEZONE),
+        id="send_cross_sell", replace_existing=True,
+        kwargs={"bot": bot}
+    )
+
+    scheduler.add_job(
+        task_deactivate_flash_sales,
+        trigger=IntervalTrigger(minutes=5),
+        id="deactivate_flash_sales", replace_existing=True,
+    )
+
+    scheduler.add_job(
+        task_update_finance_cache,
+        trigger=CronTrigger(hour=23, minute=59, timezone=TIMEZONE),
+        id="update_finance_cache", replace_existing=True,
+    )
+
+    return scheduler

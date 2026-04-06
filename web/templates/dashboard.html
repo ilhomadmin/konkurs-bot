@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% set active_page = "dashboard" %}
+
+{% block title %}Dashboard — IDROK.AI{% endblock %}
+
+{% block breadcrumbs %}
+<h1 class="text-lg font-semibold text-gray-900">Dashboard</h1>
+{% endblock %}
+
+{% block content %}
+<!-- Stat cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="stat-card">
+        <div class="flex items-center justify-between mb-3">
+            <span class="text-sm font-medium text-gray-500">Bugungi tushum</span>
+            <span class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center text-green-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/></svg>
+            </span>
+        </div>
+        <p class="text-2xl font-bold text-gray-900">{{ "{:,}".format(stats.today_revenue or 0) }} <span class="text-sm font-normal text-gray-500">so'm</span></p>
+    </div>
+    <div class="stat-card">
+        <div class="flex items-center justify-between mb-3">
+            <span class="text-sm font-medium text-gray-500">Sof foyda</span>
+            <span class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+            </span>
+        </div>
+        <p class="text-2xl font-bold text-gray-900">{{ "{:,}".format(stats.today_profit or 0) }} <span class="text-sm font-normal text-gray-500">so'm</span></p>
+    </div>
+    <div class="stat-card">
+        <div class="flex items-center justify-between mb-3">
+            <span class="text-sm font-medium text-gray-500">Buyurtmalar</span>
+            <span class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            </span>
+        </div>
+        <p class="text-2xl font-bold text-gray-900">{{ stats.today_orders or 0 }}</p>
+    </div>
+    <div class="stat-card">
+        <div class="flex items-center justify-between mb-3">
+            <span class="text-sm font-medium text-gray-500">Faol akkauntlar</span>
+            <span class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+            </span>
+        </div>
+        <p class="text-2xl font-bold text-gray-900">{{ stats.available_accounts or 0 }}</p>
+    </div>
+</div>
+
+<!-- Chart + Recent orders -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <!-- Chart -->
+    <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <h3 class="text-sm font-semibold text-gray-900 mb-4">7 kunlik daromad</h3>
+        <canvas id="revenueChart" height="200"></canvas>
+    </div>
+
+    <!-- Alerts -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <h3 class="text-sm font-semibold text-gray-900 mb-4">Ogohlantirishlar</h3>
+        <div class="space-y-3">
+            {% if stats.pending_replacements > 0 %}
+            <a href="/replacements" class="flex items-center gap-3 p-3 bg-red-50 rounded-lg hover:bg-red-100 transition">
+                <span class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center text-red-600 text-sm font-bold">{{ stats.pending_replacements }}</span>
+                <span class="text-sm text-red-700">Kutilayotgan almashtirishlar</span>
+            </a>
+            {% endif %}
+            {% if stats.pending_orders > 0 %}
+            <a href="/orders?status=pending_payment" class="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition">
+                <span class="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-600 text-sm font-bold">{{ stats.pending_orders }}</span>
+                <span class="text-sm text-yellow-700">To'lov kutilayotgan buyurtmalar</span>
+            </a>
+            {% endif %}
+            {% for item in stats.low_stock %}
+            <div class="flex items-center gap-3 p-3 bg-orange-50 rounded-lg">
+                <span class="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 text-sm font-bold">{{ item.cnt }}</span>
+                <span class="text-sm text-orange-700">{{ item.name_uz }} — kam stok</span>
+            </div>
+            {% endfor %}
+            {% if not stats.pending_replacements and not stats.pending_orders and not stats.low_stock %}
+            <p class="text-sm text-gray-400 text-center py-4">Hozircha ogohlantirish yo'q</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Recent orders -->
+<div class="table-container">
+    <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-gray-900">Oxirgi buyurtmalar</h3>
+        <a href="/orders" class="text-sm text-indigo-600 hover:text-indigo-700 font-medium">Barchasi &rarr;</a>
+    </div>
+    <table class="w-full">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-5 py-3">#</th>
+                <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-5 py-3">Mijoz</th>
+                <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-5 py-3">Summa</th>
+                <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-5 py-3">Status</th>
+                <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-5 py-3">Sana</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for order in recent_orders %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-5 py-3 text-sm text-gray-900 font-medium">{{ order.id }}</td>
+                <td class="px-5 py-3 text-sm text-gray-600">{{ order.full_name or order.username or order.telegram_id }}</td>
+                <td class="px-5 py-3 text-sm text-gray-900">{{ "{:,}".format(order.total_amount) }} so'm</td>
+                <td class="px-5 py-3">
+                    {% if order.status == 'delivered' %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Yetkazildi</span>
+                    {% elif order.status == 'pending_payment' %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">To'lov kutilmoqda</span>
+                    {% elif order.status == 'cancelled' %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Bekor</span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{{ order.status }}</span>
+                    {% endif %}
+                </td>
+                <td class="px-5 py-3 text-sm text-gray-500">{{ order.created_at[:16] if order.created_at else '' }}</td>
+            </tr>
+            {% endfor %}
+            {% if not recent_orders %}
+            <tr><td colspan="5" class="px-5 py-8 text-center text-sm text-gray-400">Buyurtmalar yo'q</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ctx = document.getElementById('revenueChart').getContext('2d');
+const chartData = {{ chart_data | tojson }};
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: chartData.labels,
+        datasets: [{
+            label: 'Daromad',
+            data: chartData.revenue,
+            backgroundColor: 'rgba(79, 70, 229, 0.8)',
+            borderRadius: 6,
+        }, {
+            label: 'Xarajat',
+            data: chartData.expenses,
+            backgroundColor: 'rgba(239, 68, 68, 0.6)',
+            borderRadius: 6,
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) { return value.toLocaleString() + " so'm"; }
+                }
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

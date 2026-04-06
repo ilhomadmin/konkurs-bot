@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% set active_page = "admins" %}
+
+{% block title %}Adminlar — IDROK.AI Admin{% endblock %}
+
+{% block breadcrumbs %}
+<span class="text-sm text-gray-500">Adminlar</span>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="{ showAdd: false, editId: null, passwordId: null, newPassword: '' }">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-semibold text-gray-900">Adminlar</h1>
+            <p class="text-sm text-gray-500 mt-1">Tizim administratorlarini boshqarish</p>
+        </div>
+        <button @click="showAdd = !showAdd" class="btn-primary inline-flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Yangi admin
+        </button>
+    </div>
+
+    <!-- Add form -->
+    <div x-show="showAdd" x-cloak class="bg-white rounded-xl shadow-sm border border-indigo-100 p-6">
+        <h2 class="text-base font-semibold text-gray-800 mb-4">Yangi admin qo'shish</h2>
+        <form method="POST" action="/admins/add" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+                <label class="label" for="admin_telegram_id">Telegram ID <span class="text-red-500">*</span></label>
+                <input id="admin_telegram_id" name="telegram_id" type="number" required class="input-field" placeholder="123456789">
+            </div>
+            <div>
+                <label class="label" for="admin_username">Username</label>
+                <input id="admin_username" name="username" type="text" class="input-field" placeholder="@username">
+            </div>
+            <div>
+                <label class="label" for="admin_full_name">Ism</label>
+                <input id="admin_full_name" name="full_name" type="text" class="input-field" placeholder="To'liq ism">
+            </div>
+            <div>
+                <label class="label" for="admin_role">Rol <span class="text-red-500">*</span></label>
+                <select id="admin_role" name="role" required class="input-field">
+                    <option value="admin">Admin</option>
+                    <option value="operator">Operator</option>
+                </select>
+            </div>
+            <div>
+                <label class="label" for="admin_password">Parol</label>
+                <input id="admin_password" name="password" type="password" class="input-field" placeholder="Web panel uchun parol">
+            </div>
+            <div class="sm:col-span-2 lg:col-span-3 flex items-end justify-end gap-2">
+                <button type="button" @click="showAdd = false" class="btn-secondary">Bekor qilish</button>
+                <button type="submit" class="btn-primary">Qo'shish</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Table -->
+    <div class="table-container">
+        {% if admins %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-gray-100 bg-gray-50">
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">#</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Telegram ID</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Username</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Ism</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Rol</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Parol</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Status</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Amallar</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    {% for a in admins %}
+                    <tr class="even:bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                        <td class="px-4 py-3 text-gray-400">{{ loop.index }}</td>
+                        <td class="px-4 py-3 font-mono text-xs text-gray-700">{{ a.telegram_id }}</td>
+                        <td class="px-4 py-3 text-gray-600">{{ a.username or '—' }}</td>
+                        <td class="px-4 py-3 font-medium text-gray-800">{{ a.full_name or '—' }}</td>
+                        <td class="px-4 py-3 text-center">
+                            {% if a.role == 'owner' %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">Owner</span>
+                            {% elif a.role == 'admin' %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Admin</span>
+                            {% else %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Operator</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            {% if a.password_hash %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">O'rnatilgan</span>
+                            {% else %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Yo'q</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            {% if a.is_active %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Faol</span>
+                            {% else %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Nofaol</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="flex items-center justify-center gap-2 flex-wrap">
+                                <!-- Role change -->
+                                <div x-show="editId !== {{ a.telegram_id }}" class="flex items-center gap-2">
+                                    <button @click="editId = {{ a.telegram_id }}" class="text-indigo-600 hover:text-indigo-800 text-xs font-medium">Rol</button>
+                                    <button @click="passwordId = {{ a.telegram_id }}" class="text-blue-600 hover:text-blue-800 text-xs font-medium">Parol</button>
+                                    <form method="POST" action="/admins/{{ a.telegram_id }}/toggle" class="inline">
+                                        <button type="submit" class="text-xs font-medium {% if a.is_active %}text-amber-600 hover:text-amber-800{% else %}text-green-600 hover:text-green-800{% endif %}">
+                                            {% if a.is_active %}O'chir{% else %}Yoq{% endif %}
+                                        </button>
+                                    </form>
+                                    <form method="POST" action="/admins/{{ a.telegram_id }}/delete" class="inline"
+                                          onsubmit="return confirm('Adminni o\'chirishni tasdiqlaysizmi?')">
+                                        <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium">O'chirish</button>
+                                    </form>
+                                </div>
+                                <!-- Inline role edit -->
+                                <form x-show="editId === {{ a.telegram_id }}" x-cloak method="POST" action="/admins/{{ a.telegram_id }}/role" class="flex items-center gap-1">
+                                    <select name="role" class="input-field py-1 text-xs w-24">
+                                        <option value="admin" {% if a.role == 'admin' %}selected{% endif %}>Admin</option>
+                                        <option value="operator" {% if a.role == 'operator' %}selected{% endif %}>Operator</option>
+                                    </select>
+                                    <button type="submit" class="text-green-600 hover:text-green-800 text-xs font-medium">OK</button>
+                                    <button type="button" @click="editId = null" class="text-gray-400 hover:text-gray-600 text-xs">X</button>
+                                </form>
+                                <!-- Inline password set -->
+                                <form x-show="passwordId === {{ a.telegram_id }}" x-cloak method="POST" action="/admins/{{ a.telegram_id }}/password" class="flex items-center gap-1">
+                                    <input name="password" type="password" required class="input-field py-1 text-xs w-28" placeholder="Yangi parol">
+                                    <button type="submit" class="text-green-600 hover:text-green-800 text-xs font-medium">OK</button>
+                                    <button type="button" @click="passwordId = null" class="text-gray-400 hover:text-gray-600 text-xs">X</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="flex flex-col items-center justify-center py-16 text-center">
+            <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+            </svg>
+            <p class="text-gray-500 font-medium">Adminlar yo'q</p>
+            <p class="text-gray-400 text-sm mt-1">Birinchi adminni qo'shing</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

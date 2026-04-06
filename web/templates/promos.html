@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% set active_page = "promos" %}
+
+{% block title %}Promo-kodlar — IDROK.AI Admin{% endblock %}
+
+{% block breadcrumbs %}
+<span class="text-sm text-gray-500">Promo-kodlar</span>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="{ showAdd: false }">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-semibold text-gray-900">Promo-kodlar</h1>
+            <p class="text-sm text-gray-500 mt-1">Chegirma kodlarini boshqarish</p>
+        </div>
+        <button @click="showAdd = !showAdd" class="btn-primary inline-flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Yangi promo-kod
+        </button>
+    </div>
+
+    <!-- Add form -->
+    <div x-show="showAdd" x-cloak class="bg-white rounded-xl shadow-sm border border-indigo-100 p-6">
+        <h2 class="text-base font-semibold text-gray-800 mb-4">Yangi promo-kod</h2>
+        <form method="POST" action="/promos/add" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+                <label class="label" for="promo_code">Kod <span class="text-red-500">*</span></label>
+                <input id="promo_code" name="code" type="text" required class="input-field uppercase"
+                       placeholder="SUMMER25"
+                       style="text-transform:uppercase">
+            </div>
+            <div>
+                <label class="label" for="promo_discount_type">Chegirma turi <span class="text-red-500">*</span></label>
+                <select id="promo_discount_type" name="discount_type" required class="input-field">
+                    <option value="percent">Foiz (%)</option>
+                    <option value="fixed">Belgilangan summa (so'm)</option>
+                </select>
+            </div>
+            <div>
+                <label class="label" for="promo_discount_value">Chegirma miqdori <span class="text-red-500">*</span></label>
+                <input id="promo_discount_value" name="discount_value" type="number" required min="0" step="1" class="input-field" placeholder="0">
+            </div>
+            <div>
+                <label class="label" for="promo_max_uses">Max foydalanish</label>
+                <input id="promo_max_uses" name="max_uses" type="number" min="1" class="input-field" placeholder="Cheksiz">
+            </div>
+            <div>
+                <label class="label" for="promo_expires_at">Muddati</label>
+                <input id="promo_expires_at" name="expires_at" type="date" class="input-field">
+            </div>
+            <div>
+                <label class="label" for="promo_min_amount">Min. buyurtma (so'm)</label>
+                <input id="promo_min_amount" name="min_order_amount" type="number" min="0" step="100" class="input-field" placeholder="0">
+            </div>
+            <div class="sm:col-span-2 lg:col-span-3 flex justify-end gap-2">
+                <button type="button" @click="showAdd = false" class="btn-secondary">Bekor qilish</button>
+                <button type="submit" class="btn-primary">Qo'shish</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Table -->
+    <div class="table-container">
+        {% if promos %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-gray-100 bg-gray-50">
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">#</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Kod</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Chegirma</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Foydalanish</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Muddati</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Status</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Amallar</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    {% for promo in promos %}
+                    <tr class="even:bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                        <td class="px-4 py-3 text-gray-400">{{ loop.index }}</td>
+                        <td class="px-4 py-3">
+                            <span class="font-mono font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded text-sm">{{ promo.code }}</span>
+                        </td>
+                        <td class="px-4 py-3 font-medium text-gray-800">
+                            {% if promo.discount_type == 'percent' %}
+                            {{ promo.discount_value }}%
+                            {% else %}
+                            {{ "{:,}".format(promo.discount_value|int) }} so'm
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-center text-gray-600">
+                            {{ promo.used_count or 0 }}
+                            {% if promo.max_uses %} / {{ promo.max_uses }}{% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-gray-500 text-xs">
+                            {{ promo.expires_at or 'Cheksiz' }}
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            {% if promo.is_active %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Faol</span>
+                            {% else %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Nofaol</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <div class="flex items-center justify-center gap-2">
+                                <form method="POST" action="/promos/{{ promo.id }}/toggle" class="inline">
+                                    <button type="submit" class="text-xs font-medium {% if promo.is_active %}text-amber-600 hover:text-amber-800{% else %}text-green-600 hover:text-green-800{% endif %}">
+                                        {% if promo.is_active %}O'chir{% else %}Yoq{% endif %}
+                                    </button>
+                                </form>
+                                <form method="POST" action="/promos/{{ promo.id }}/delete" class="inline"
+                                      onsubmit="return confirm('Promo-kodni o\'chirishni tasdiqlaysizmi?')">
+                                    <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium">O'chirish</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="flex flex-col items-center justify-center py-16 text-center">
+            <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+            </svg>
+            <p class="text-gray-500 font-medium">Promo-kodlar yo'q</p>
+            <p class="text-gray-400 text-sm mt-1">Birinchi promo-kodni qo'shing</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

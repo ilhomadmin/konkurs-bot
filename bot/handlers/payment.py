@@ -3,6 +3,7 @@ To'lov handlerlari:
 - Mijoz chek yuboradi
 - Bot guruhga forward qiladi
 - Admin guruhda tasdiqlaydi → akkauntlar yetkaziladi
+YANGI STRUKTURA: duration_tier yo'q
 """
 import logging
 from aiogram import Router, F, Bot
@@ -10,13 +11,13 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 
 from bot.config import PAYMENT_GROUP_ID
 from bot.db.models import (
-    get_user, get_user_active_order, get_order, get_order_items,
-    update_order_status, sell_account, update_order_item,
-    increment_purchase_count, update_user_stats, update_user_vip,
+    get_user, get_order_by_id, get_order_items,
+    update_order_status, confirm_reserved,
+    release_reserved, increment_purchase_count,
+    increment_user_purchases, check_and_upgrade_vip,
     get_admin_by_telegram_id,
 )
 from bot.utils.texts import t
-from bot.utils.duration import tier_display_name
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -55,13 +56,12 @@ def build_account_delivery_text(items: list[dict], lang: str) -> str:
     for item in items:
         if item.get("status") != "delivered":
             continue
-        name = item[f"name_{lang}"]
-        tier_name = tier_display_name(item["duration_tier"], lang)
+        name = item.get(f"name_{lang}", item.get("name_uz", "?"))
         login = item.get("login") or "—"
         password = item.get("password") or "—"
-        expiry = item.get("account_expiry") or item.get("expiry_date") or "—"
+        expiry = item.get("expiry_date") or "—"
         lines.append(t("account_delivery_line", lang,
-                       num=num, name=f"{name} ({tier_name})",
+                       num=num, name=name,
                        login=login, password=password, expiry=expiry))
         num += 1
     return "\n\n".join(lines)
@@ -71,31 +71,34 @@ def build_account_delivery_text(items: list[dict], lang: str) -> str:
 
 @router.message(F.photo)
 async def payment_screenshot(message: Message, bot: Bot) -> None:
-    """
-    Mijoz rasm yuboradi — bu to'lov cheki bo'lishi mumkin.
-    Foydalanuvchida aktiv buyurtma bo'lsa, guruhga yuboriladi.
-    """
+    """Mijoz rasm yuboradi — bu to'lov cheki bo'lishi mumkin."""
     try:
         user = await get_user(message.from_user.id)
         if not user:
             return
         lang = user.get("language", "uz")
 
-        order = await get_user_active_order(message.from_user.id)
+        # Aktiv buyurtmani topish
+        from bot.db.models import get_user_orders
+        orders = await get_user_orders(message.from_user.id, limit=1)
+        order = None
+        for o in orders:
+            if o["status"] in ("pending_payment", "payment_sent"):
+                order = o
+                break
+
         if not order:
-            # Aktiv buyurtma yo'q — odatiy foydalanuvchi, ignore
             return
 
-        file_id = message.photo[-1].file_id  # Eng yuqori sifatli rasm
+        file_id = message.photo[-1].file_id
         order_id = order["id"]
 
         # Buyurtma elementlarini olish
         items = await get_order_items(order_id)
         items_text = ""
         for item in items:
-            name = item[f"name_{lang}"]
-            tier_name = tier_display_name(item["duration_tier"], lang)
-            items_text += f"• {name} ({tier_name}) x{item['quantity']}\n"
+            name = item.get(f"name_{lang}", item.get("name_uz", "?"))
+            items_text += f"• {name} x{item['quantity']}\n"
 
         full_name = user.get("full_name") or "—"
         username = user.get("username") or "—"
@@ -127,7 +130,6 @@ async def payment_screenshot(message: Message, bot: Bot) -> None:
             ]
         ])
 
-        # Chekni guruhga yuborish
         await bot.send_photo(
             chat_id=PAYMENT_GROUP_ID,
             photo=file_id,
@@ -136,20 +138,16 @@ async def payment_screenshot(message: Message, bot: Bot) -> None:
             parse_mode="HTML"
         )
 
-        # Buyurtma statusini yangilash
         await update_order_status(
             order_id, "payment_sent",
             payment_screenshot_file_id=file_id
         )
 
-        # Progress bar yangilash
         await edit_progress_bar(bot, message.from_user.id, order, "payment_sent")
-
-        # Mijozga tasdiqlash
         await message.answer(t("payment_received", lang))
 
     except Exception as e:
-        logger.error(f"Chek qabul qilishda xato: {e}")
+        logger.exception(f"payment_screenshot error: {e}")
 
 
 # ==================== ADMIN: TO'LOV TASDIQLASH ====================
@@ -160,7 +158,6 @@ async def confirm_payment(callback: CallbackQuery, bot: Bot) -> None:
     try:
         order_id = int(callback.data.split(":")[2])
 
-        # Admin tekshirish
         from bot.config import ADMIN_IDS
         is_admin = (callback.from_user.id in ADMIN_IDS or
                     await get_admin_by_telegram_id(callback.from_user.id) is not None)
@@ -168,50 +165,27 @@ async def confirm_payment(callback: CallbackQuery, bot: Bot) -> None:
             await callback.answer(t("access_denied"), show_alert=True)
             return
 
-        order = await get_order(order_id)
+        order = await get_order_by_id(order_id)
         if not order:
             await callback.answer(t("not_found"), show_alert=True)
             return
 
-        user_telegram_id = order["user_telegram_id"]
+        user_telegram_id = order["telegram_id"]
         user = await get_user(user_telegram_id)
         lang = user.get("language", "uz") if user else "uz"
 
-        # Barcha band qilingan akkauntlarni sotish
+        # Band qilingan akkauntlarni sotish
+        sold_accounts = await confirm_reserved(order_id, user_telegram_id)
+
+        # Har bir element uchun purchase_count oshirish
         items = await get_order_items(order_id)
-        from bot.db.models import get_reserved_accounts_for_order
-        reserved_accs = await get_reserved_accounts_for_order(order_id)
-
-        # Akkauntlarni product_id + tier bo'yicha guruhlaymiz
-        acc_map: dict[tuple, list] = {}
-        for acc in reserved_accs:
-            key = (acc["product_id"], acc["duration_tier"])
-            acc_map.setdefault(key, []).append(acc)
-
-        delivered_items = []
         for item in items:
-            key = (item["product_id"], item["duration_tier"])
-            accs_for_item = acc_map.get(key, [])[:item["quantity"]]
-
-            for acc in accs_for_item:
-                # Akkauntni sotilgan deb belgilash
-                await sell_account(acc["id"], user_telegram_id, "bot_order")
-                # order_item ni yangilash
-                await update_order_item(
-                    item["id"],
-                    account_id=acc["id"],
-                    status="delivered",
-                    delivered_at="CURRENT_TIMESTAMP",
-                    expiry_date=acc["expiry_date"]
-                )
-                await increment_purchase_count(item["product_id"], item["quantity"])
-
-            delivered_items.append(item)
+            await increment_purchase_count(item["product_id"])
 
         # User statistikasini yangilash
         total_qty = sum(i["quantity"] for i in items)
-        await update_user_stats(user_telegram_id, order["total_amount"], total_qty)
-        await update_user_vip(user_telegram_id)
+        await increment_user_purchases(user_telegram_id, order["total_amount"])
+        await check_and_upgrade_vip(user_telegram_id)
 
         # Buyurtma statusini yangilash
         await update_order_status(
@@ -221,9 +195,6 @@ async def confirm_payment(callback: CallbackQuery, bot: Bot) -> None:
 
         # Yangilangan itemlarni qayta o'qish (login/password bilan)
         fresh_items = await get_order_items(order_id)
-        for fi in fresh_items:
-            fi["status"] = "delivered"  # Hammasi delivered
-
         accounts_text = build_account_delivery_text(fresh_items, lang)
 
         # Mijozga akkauntlar yuborish
@@ -239,8 +210,7 @@ async def confirm_payment(callback: CallbackQuery, bot: Bot) -> None:
 
         # Video instruksiya yuborish (birinchi mahsulotdan)
         if fresh_items:
-            video_id = (fresh_items[0].get("product_video") or
-                        fresh_items[0].get("category_video"))
+            video_id = fresh_items[0].get("instruction_video_file_id")
             if video_id:
                 try:
                     await bot.send_video(
@@ -257,13 +227,13 @@ async def confirm_payment(callback: CallbackQuery, bot: Bot) -> None:
 
         # Admin guruhda xabarni yangilash
         await callback.message.edit_caption(
-            caption=(callback.message.caption or "") + f"\n\n✅ {t('payment_confirmed_admin', 'uz')} — @{callback.from_user.username or callback.from_user.id}",
+            caption=(callback.message.caption or "") + f"\n\n✅ Tasdiqlandi — @{callback.from_user.username or callback.from_user.id}",
             reply_markup=None
         )
-        await callback.answer(t("payment_confirmed_admin", "uz"))
+        await callback.answer("✅ Tasdiqlandi")
 
     except Exception as e:
-        logger.error(f"To'lov tasdiqlashda xato: {e}")
+        logger.exception(f"confirm_payment error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
@@ -280,24 +250,20 @@ async def reject_payment(callback: CallbackQuery, bot: Bot) -> None:
             await callback.answer(t("access_denied"), show_alert=True)
             return
 
-        order = await get_order(order_id)
+        order = await get_order_by_id(order_id)
         if not order:
             await callback.answer(t("not_found"), show_alert=True)
             return
 
-        user_telegram_id = order["user_telegram_id"]
+        user_telegram_id = order["telegram_id"]
         user = await get_user(user_telegram_id)
         lang = user.get("language", "uz") if user else "uz"
 
-        # Akkauntlarni ozod qilish
-        from bot.db.models import release_reserved_accounts
-        await release_reserved_accounts(order_id)
+        await release_reserved(order_id)
         await update_order_status(order_id, "cancelled")
 
-        # Progress bar yangilash
         await edit_progress_bar(bot, user_telegram_id, order, "cancelled")
 
-        # Mijozga xabar
         await bot.send_message(
             chat_id=user_telegram_id,
             text=f"❌ Buyurtma #{order_id} rad etildi. Savol bo'lsa operatorga murojaat qiling." if lang == "uz"
@@ -311,7 +277,7 @@ async def reject_payment(callback: CallbackQuery, bot: Bot) -> None:
         await callback.answer("❌ Rad etildi")
 
     except Exception as e:
-        logger.error(f"To'lovni rad etishda xato: {e}")
+        logger.exception(f"reject_payment error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
@@ -333,11 +299,10 @@ async def partial_confirm_start(callback: CallbackQuery, bot: Bot) -> None:
         items = await get_order_items(order_id)
         buttons = []
         for item in items:
-            name = item.get("name_uz", "")
-            tier_name = tier_display_name(item["duration_tier"], "uz")
+            name = item.get("name_uz", "?")
             buttons.append([
                 InlineKeyboardButton(
-                    text=f"✅ {name} ({tier_name}) x{item['quantity']}",
+                    text=f"✅ {name} x{item['quantity']}",
                     callback_data=f"pay:pok:{order_id}:{item['id']}"
                 ),
                 InlineKeyboardButton(
@@ -356,7 +321,7 @@ async def partial_confirm_start(callback: CallbackQuery, bot: Bot) -> None:
         )
         await callback.answer()
     except Exception as e:
-        logger.error(f"Qisman tasdiqlashda xato: {e}")
+        logger.exception(f"partial_confirm_start error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
@@ -368,36 +333,36 @@ async def partial_item_ok(callback: CallbackQuery, bot: Bot) -> None:
         order_id = int(parts[2])
         item_id = int(parts[3])
 
-        order = await get_order(order_id)
+        order = await get_order_by_id(order_id)
         if not order:
             await callback.answer(t("not_found"), show_alert=True)
             return
 
-        user_telegram_id = order["user_telegram_id"]
+        user_telegram_id = order["telegram_id"]
         user = await get_user(user_telegram_id)
         lang = user.get("language", "uz") if user else "uz"
 
-        # Bu elementni deliver qilish
         items = await get_order_items(order_id)
         target_item = next((i for i in items if i["id"] == item_id), None)
         if not target_item:
             await callback.answer(t("not_found"), show_alert=True)
             return
 
-        from bot.db.models import get_reserved_accounts_for_order
-        reserved_accs = await get_reserved_accounts_for_order(order_id)
-        accs_for_item = [a for a in reserved_accs
-                         if a["product_id"] == target_item["product_id"]
-                         and a.get("duration_tier") == target_item["duration_tier"]]
+        # Bu element uchun band qilingan akkauntlarni sotish
+        from bot.db.models import sell_account
+        from bot.db.database import get_db
+        async with get_db() as db:
+            cursor = await db.execute("""
+                SELECT id FROM accounts
+                WHERE reserved_for_order_id = ? AND product_id = ? AND status = 'reserved'
+                LIMIT ?
+            """, (order_id, target_item["product_id"], target_item["quantity"]))
+            acc_rows = await cursor.fetchall()
 
-        for acc in accs_for_item[:target_item["quantity"]]:
-            await sell_account(acc["id"], user_telegram_id, "bot_order")
-            await update_order_item(item_id,
-                                    account_id=acc["id"],
-                                    status="delivered",
-                                    delivered_at="CURRENT_TIMESTAMP",
-                                    expiry_date=acc["expiry_date"])
-            await increment_purchase_count(target_item["product_id"])
+            for acc_row in acc_rows:
+                await sell_account(target_item["product_id"], order_id, user_telegram_id)
+
+        await increment_purchase_count(target_item["product_id"])
 
         # Status yangilash
         all_items = await get_order_items(order_id)
@@ -408,10 +373,8 @@ async def partial_item_ok(callback: CallbackQuery, bot: Bot) -> None:
         await update_order_status(order_id, new_status,
                                   payment_verified_by=callback.from_user.id)
 
-        # Progress bar
         await edit_progress_bar(bot, user_telegram_id, order, new_status)
 
-        # Mijozga tayyor bo'lgan akkauntlarni yuborish
         fresh_items = await get_order_items(order_id)
         delivered_items = [i for i in fresh_items if i["status"] == "delivered"]
         accounts_text = build_account_delivery_text(delivered_items, lang)
@@ -428,5 +391,5 @@ async def partial_item_ok(callback: CallbackQuery, bot: Bot) -> None:
 
         await callback.answer(f"✅ {delivered} ta yetkazildi")
     except Exception as e:
-        logger.error(f"Qisman tasdiqlashda xato: {e}")
+        logger.exception(f"partial_item_ok error: {e}")
         await callback.answer(t("error_general"), show_alert=True)

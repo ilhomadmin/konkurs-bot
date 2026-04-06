@@ -1,15 +1,13 @@
 """
 Admin: Buyurtmalar boshqarish
+YANGI STRUKTURA: duration_tier yo'q
 """
 import logging
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
-from bot.db.models import (
-    get_user, get_admin_by_telegram_id, get_order, get_order_items,
-)
+from bot.db.models import get_user, get_order_by_id, get_order_items
 from bot.utils.texts import t
-from bot.utils.duration import tier_display_name
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -34,7 +32,6 @@ async def get_lang_and_role(user_id: int) -> tuple[str, str | None]:
 
 @router.callback_query(F.data == "adm:orders")
 async def admin_orders_menu(callback: CallbackQuery) -> None:
-    """Admin buyurtmalar menyusi — so'nggi pending buyurtmalar"""
     try:
         lang, role = await get_lang_and_role(callback.from_user.id)
         if not role:
@@ -52,8 +49,7 @@ async def admin_orders_menu(callback: CallbackQuery) -> None:
                 ORDER BY o.created_at DESC
                 LIMIT 20
             """)
-            rows = await cursor.fetchall()
-            orders = [dict(r) for r in rows]
+            orders = [dict(r) for r in await cursor.fetchall()]
 
         if not orders:
             await callback.message.edit_text(
@@ -81,13 +77,12 @@ async def admin_orders_menu(callback: CallbackQuery) -> None:
         )
         await callback.answer()
     except Exception as e:
-        logger.error(f"Admin orders error: {e}")
+        logger.exception(f"admin_orders_menu error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("adm:ord:"))
 async def admin_order_detail(callback: CallbackQuery) -> None:
-    """Admin buyurtma tafsiloti"""
     try:
         order_id = int(callback.data.split(":")[2])
         lang, role = await get_lang_and_role(callback.from_user.id)
@@ -96,7 +91,7 @@ async def admin_order_detail(callback: CallbackQuery) -> None:
             await callback.answer(t("access_denied", lang), show_alert=True)
             return
 
-        order = await get_order(order_id)
+        order = await get_order_by_id(order_id)
         if not order:
             await callback.answer(t("not_found", lang), show_alert=True)
             return
@@ -106,13 +101,12 @@ async def admin_order_detail(callback: CallbackQuery) -> None:
         status_emoji = STATUS_EMOJI.get(order["status"], "⬜")
         items_text = ""
         for item in items:
-            name = item[f"name_{lang}"]
-            tier_name = tier_display_name(item["duration_tier"], lang)
-            status = "✅" if item["status"] == "delivered" else "⬜"
-            items_text += f"{status} {name} ({tier_name}) x{item['quantity']}\n"
+            name = item.get(f"name_{lang}", item.get("name_uz", "?"))
+            status = "✅" if item.get("status") == "delivered" else "⬜"
+            items_text += f"{status} {name} x{item['quantity']}\n"
 
-        full_name = order.get("user_full_name") or "—"
-        username = order.get("user_username") or "—"
+        full_name = order.get("full_name") or "—"
+        username = order.get("username") or "—"
         date_str = str(order["created_at"])[:16]
 
         text = (
@@ -143,5 +137,5 @@ async def admin_order_detail(callback: CallbackQuery) -> None:
         )
         await callback.answer()
     except Exception as e:
-        logger.error(f"Admin order detail error: {e}")
+        logger.exception(f"admin_order_detail error: {e}")
         await callback.answer(t("error_general"), show_alert=True)

@@ -570,15 +570,13 @@ TEXTS: dict[str, dict[str, str]] = {
         "uz": "✅ Buyurtma #{order_id} yaratildi!\n"
               "⬜⬜⬜⬜ To'lov kutilmoqda\n\n"
               "💰 {amount:,} so'm\n"
-              "💳 Click: {click}\n"
-              "💳 Payme: {payme}\n\n"
+              "{payment_info}\n\n"
               "📸 Chekni shu yerga yuboring\n"
               "⏳ 30 daqiqa vaqtingiz bor!",
         "ru": "✅ Заказ #{order_id} создан!\n"
               "⬜⬜⬜⬜ Ожидание оплаты\n\n"
               "💰 {amount:,} сум\n"
-              "💳 Click: {click}\n"
-              "💳 Payme: {payme}\n\n"
+              "{payment_info}\n\n"
               "📸 Отправьте чек сюда\n"
               "⏳ У вас 30 минут!"
     },
@@ -705,12 +703,12 @@ TEXTS: dict[str, dict[str, str]] = {
               "{items}"
     },
     "order_item_detail": {
-        "uz": "• {name} ({tier}) x{qty}\n  Login: <code>{login}</code>\n  Parol: <code>{password}</code>\n  Muddat: {expiry}",
-        "ru": "• {name} ({tier}) x{qty}\n  Логин: <code>{login}</code>\n  Пароль: <code>{password}</code>\n  До: {expiry}"
+        "uz": "• {name} x{qty}\n  Login: <code>{login}</code>\n  Parol: <code>{password}</code>\n  Muddat: {expiry}",
+        "ru": "• {name} x{qty}\n  Логин: <code>{login}</code>\n  Пароль: <code>{password}</code>\n  До: {expiry}"
     },
     "order_item_pending": {
-        "uz": "• {name} ({tier}) x{qty} — kutilmoqda",
-        "ru": "• {name} ({tier}) x{qty} — ожидается"
+        "uz": "• {name} x{qty} — kutilmoqda",
+        "ru": "• {name} x{qty} — ожидается"
     },
     "btn_instruction_video": {
         "uz": "📹 Instruksiya",
@@ -731,14 +729,14 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "🛒 Прямая продажа:"
     },
     "ds_account_info": {
-        "uz": "🛒 Sotish: <b>{name}</b> ({tier})\n"
+        "uz": "🛒 Sotish: <b>{name}</b>\n"
               "📊 Mavjud: {available} ta\n"
               "🔢 Birinchi: #{acc_id} ({days} kun)\n\n"
               "👤 Login: <code>{login}</code>\n"
               "🔑 Parol: <code>{password}</code>\n"
               "📅 Muddat: {expiry}\n\n"
               "🔗 Link: {link}",
-        "ru": "🛒 Продажа: <b>{name}</b> ({tier})\n"
+        "ru": "🛒 Продажа: <b>{name}</b>\n"
               "📊 Доступно: {available} шт\n"
               "🔢 Первый: #{acc_id} ({days} дней)\n\n"
               "👤 Логин: <code>{login}</code>\n"
@@ -883,12 +881,12 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "⚠️ <b>УВЕДОМЛЕНИЕ О ЗАПАСАХ:</b>\n\n{items}"
     },
     "low_stock_item": {
-        "uz": "• {name} ({tier}) — faqat <b>{cnt}</b> ta!",
-        "ru": "• {name} ({tier}) — всего <b>{cnt}</b> шт!"
+        "uz": "• {name} — faqat <b>{cnt}</b> ta!",
+        "ru": "• {name} — всего <b>{cnt}</b> шт!"
     },
     "stock_restored_notify": {
-        "uz": "🔔 <b>{name}</b> ({tier}) yana sotuvda!\n💰 {price:,} so'm\n\nTez oling — tez tugaydi! 🔥",
-        "ru": "🔔 <b>{name}</b> ({tier}) снова в наличии!\n💰 {price:,} сум\n\nБерите скорей — быстро разбирают! 🔥"
+        "uz": "🔔 <b>{name}</b> yana sotuvda!\n💰 {price:,} so'm\n\nTez oling — tez tugaydi! 🔥",
+        "ru": "🔔 <b>{name}</b> снова в наличии!\n💰 {price:,} сум\n\nБерите скорей — быстро разбирают! 🔥"
     },
     "btn_buy_now": {
         "uz": "🛒 Xarid qilish",
@@ -1342,6 +1340,24 @@ TEXTS: dict[str, dict[str, str]] = {
     "abandoned_cart_reminder": {
         "uz": "🛒 Savatchangizda {count} ta mahsulot qoldi!\n\nXaridni yakunlash uchun /start",
         "ru": "🛒 В вашей корзине осталось {count} товаров!\n\nЗавершите покупку /start"
+    },
+
+    # ==================== YANGI STRUKTURA UCHUN QO'SHIMCHALAR ====================
+    "account_created_simple": {
+        "uz": "✅ Akkaunt qo'shildi! Muddati: {days} kun",
+        "ru": "✅ Аккаунт добавлен! Срок: {days} дней"
+    },
+    "ask_duration_text_uz": {
+        "uz": "⏱ Muddat matnini kiriting (uz):\n\nMasalan: '1 oylik', '1 yillik'\n/skip — bo'sh qoldirish",
+        "ru": "⏱ Введите текст срока (uz):\n\nНапример: '1 oylik', '1 yillik'\n/skip — пропустить"
+    },
+    "ask_duration_text_ru": {
+        "uz": "⏱ Muddat matnini kiriting (ru):\n\nMasalan: '1 месяц', '1 год'\n/skip — bo'sh qoldirish",
+        "ru": "⏱ Введите текст срока (ru):\n\nНапример: '1 месяц', '1 год'\n/skip — пропустить"
+    },
+    "added_to_cart_simple": {
+        "uz": "✅ {name} savatga qo'shildi!",
+        "ru": "✅ {name} добавлен в корзину!"
     },
 
 }

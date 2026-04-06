@@ -1,6 +1,8 @@
 """
 Savat handlerlari — ko'rish, son o'zgartirish, promo kod, buyurtma berish
+YANGI STRUKTURA: duration_tier yo'q, mahsulot = obuna turi
 """
+import logging
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -8,49 +10,29 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 
 from bot.db.models import (
     get_user, cart_get, cart_update_qty, cart_remove_item, cart_clear,
-    get_promo_by_code, get_vip_level,
+    get_promo_by_code, get_product_stock,
 )
 from bot.utils.texts import t
-from bot.utils.duration import tier_display_name
 
+logger = logging.getLogger(__name__)
 router = Router()
 
-
-# ==================== FSM ====================
 
 class PromoFSM(StatesGroup):
     code = State()
 
 
-# ==================== KLAVIATURA ====================
-
 def cart_kb(items: list[dict], lang: str, promo_applied: bool = False) -> InlineKeyboardMarkup:
-    """Savat klaviaturasi — har element uchun -/+ va o'chirish"""
     buttons = []
     for item in items:
-        tier_name = tier_display_name(item["duration_tier"], lang)
-        name = item[f"name_{lang}"]
-        # -/+ / o'chirish qatori
+        name = item.get(f"name_{lang}", item.get("name_uz", "?"))
         buttons.append([
-            InlineKeyboardButton(
-                text="➖",
-                callback_data=f"cart:dec:{item['product_id']}:{item['duration_tier']}"
-            ),
-            InlineKeyboardButton(
-                text=f"{name} ({tier_name}) x{item['quantity']}",
-                callback_data="noop"
-            ),
-            InlineKeyboardButton(
-                text="➕",
-                callback_data=f"cart:inc:{item['product_id']}:{item['duration_tier']}"
-            ),
-            InlineKeyboardButton(
-                text="🗑",
-                callback_data=f"cart:del:{item['id']}"
-            ),
+            InlineKeyboardButton(text="➖", callback_data=f"cart:dec:{item['product_id']}"),
+            InlineKeyboardButton(text=f"{name} x{item['quantity']}", callback_data="noop"),
+            InlineKeyboardButton(text="➕", callback_data=f"cart:inc:{item['product_id']}"),
+            InlineKeyboardButton(text="🗑", callback_data=f"cart:del:{item['product_id']}"),
         ])
 
-    # Pastki tugmalar
     bottom = []
     if not promo_applied:
         bottom.append(InlineKeyboardButton(text=t("btn_promo", lang), callback_data="cart:promo"))
@@ -64,48 +46,46 @@ def cart_kb(items: list[dict], lang: str, promo_applied: bool = False) -> Inline
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-# ==================== SAVAT MATNINI HISOBLASH ====================
-
 async def build_cart_text(
     user_id: int,
     items: list[dict],
     lang: str,
     promo: dict | None = None
 ) -> tuple[str, int, int, int]:
-    """
-    Savat matnini va summalarni hisoblaydi.
-    Returns: (text, total, discount_amount, final_amount)
-    """
     user = await get_user(user_id)
     if not user:
         return t("cart_empty", lang), 0, 0, 0
 
     lines = [t("cart_title", lang)]
 
-    # VIP daraja
+    # VIP
     vip_level = user.get("vip_level", "standard")
-    vip_info = await get_vip_level(vip_level)
-    vip_pct = vip_info["discount_percent"] if vip_info else 0
-    vip_name = vip_info[f"display_name_{lang}"] if vip_info else "Oddiy"
+    vip_pct = 0
+    vip_name = "Oddiy"
+    try:
+        from bot.db.models import get_vip_levels
+        vip_levels = await get_vip_levels()
+        for vl in vip_levels:
+            if vl["level"] == vip_level:
+                vip_pct = vl["discount_percent"]
+                vip_name = vl[f"display_name_{lang}"]
+                break
+    except Exception:
+        pass
 
     if vip_pct > 0:
         lines.append(t("cart_vip_line", lang, vip_name=vip_name, pct=vip_pct))
 
-    # Elementlar
     total = 0
     for i, item in enumerate(items, 1):
-        name = item[f"name_{lang}"]
-        tier_name = tier_display_name(item["duration_tier"], lang)
-        price = item["price"] * item["quantity"]
+        name = item.get(f"name_{lang}", item.get("name_uz", "?"))
+        price = item.get("price", 0) * item["quantity"]
         total += price
-        lines.append(t("cart_item_line", lang,
-                       num=i, name=name, tier=tier_name,
-                       qty=item["quantity"], price=price))
+        lines.append(f"  {i}. {name} x{item['quantity']} = {price:,} so'm")
 
     lines.append("")
     lines.append(t("cart_total", lang, total=total))
 
-    # Chegirma hisoblash: max(vip, promo)
     promo_pct = promo["discount_percent"] if promo else 0
     final_pct = max(vip_pct, promo_pct)
     discount_amount = int(total * final_pct / 100)
@@ -114,19 +94,14 @@ async def build_cart_text(
     if final_pct > 0:
         if promo_pct >= vip_pct and promo:
             label = f"🏷 Promo ({promo['code']})"
-            icon = "🏷"
         else:
-            label = vip_name
-            icon = "💎"
-        lines.append(t("cart_discount_line", lang,
-                       icon=icon, label=label, pct=final_pct, amount=discount_amount))
+            label = f"💎 {vip_name}"
+        lines.append(f"  {label}: -{final_pct}% = -{discount_amount:,} so'm")
 
     lines.append(t("cart_final", lang, final=final_amount))
 
     return "\n".join(lines), total, discount_amount, final_amount
 
-
-# ==================== HANDLERLAR ====================
 
 async def show_cart(
     message: Message,
@@ -134,7 +109,6 @@ async def show_cart(
     promo: dict | None = None,
     edit: bool = False
 ) -> None:
-    """Savatni ko'rsatish (message yoki edit sifatida)"""
     user = await get_user(user_id)
     lang = user.get("language", "uz") if user else "uz"
 
@@ -151,7 +125,6 @@ async def show_cart(
         return
 
     text, total, discount, final = await build_cart_text(user_id, items, lang, promo)
-
     kb = cart_kb(items, lang, promo_applied=promo is not None)
     if edit:
         await message.edit_text(text, reply_markup=kb)
@@ -161,82 +134,66 @@ async def show_cart(
 
 @router.message(F.text.in_(["🛒 Savat", "🛒 Корзина"]))
 async def cart_handler(message: Message) -> None:
-    """Savat tugmasi bosilganda"""
     try:
         await show_cart(message, message.from_user.id)
-    except Exception:
+    except Exception as e:
+        logger.exception(f"cart_handler error: {e}")
         await message.answer(t("error_general"))
 
 
 @router.callback_query(F.data.startswith("cart:inc:"))
 async def cart_increase(callback: CallbackQuery) -> None:
-    """Miqdorni oshirish"""
     try:
-        _, _, product_id_str, tier = callback.data.split(":")
-        product_id = int(product_id_str)
+        product_id = int(callback.data.split(":")[2])
         user = await get_user(callback.from_user.id)
         lang = user.get("language", "uz") if user else "uz"
 
-        # Joriy miqdorni topish
-        from bot.db.models import cart_item_in_cart
-        item = await cart_item_in_cart(callback.from_user.id, product_id, tier)
-        if not item:
-            await callback.answer()
+        stock = await get_product_stock(product_id)
+        items = await cart_get(callback.from_user.id)
+        current_qty = 0
+        for it in items:
+            if it["product_id"] == product_id:
+                current_qty = it["quantity"]
+                break
+
+        if current_qty >= stock:
+            await callback.answer(t("qty_exceeds_stock", lang, available=stock), show_alert=True)
             return
 
-        # Mavjudlikni tekshirish
-        from bot.db.models import get_available_count
-        stats = await get_available_count(product_id, tier)
-        available = stats.get("available", 0)
-
-        new_qty = item["quantity"] + 1
-        if new_qty > available + item["quantity"]:
-            await callback.answer(t("qty_exceeds_stock", lang, available=available), show_alert=True)
-            return
-
-        await cart_update_qty(callback.from_user.id, product_id, tier, new_qty)
+        await cart_update_qty(callback.from_user.id, product_id, 1)
         await show_cart(callback.message, callback.from_user.id, edit=True)
         await callback.answer()
-    except Exception:
+    except Exception as e:
+        logger.exception(f"cart_increase error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("cart:dec:"))
 async def cart_decrease(callback: CallbackQuery) -> None:
-    """Miqdorni kamaytirish"""
     try:
-        _, _, product_id_str, tier = callback.data.split(":")
-        product_id = int(product_id_str)
-
-        from bot.db.models import cart_item_in_cart
-        item = await cart_item_in_cart(callback.from_user.id, product_id, tier)
-        if not item:
-            await callback.answer()
-            return
-
-        new_qty = item["quantity"] - 1
-        await cart_update_qty(callback.from_user.id, product_id, tier, new_qty)
+        product_id = int(callback.data.split(":")[2])
+        await cart_update_qty(callback.from_user.id, product_id, -1)
         await show_cart(callback.message, callback.from_user.id, edit=True)
         await callback.answer()
-    except Exception:
+    except Exception as e:
+        logger.exception(f"cart_decrease error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("cart:del:"))
 async def cart_delete_item(callback: CallbackQuery) -> None:
-    """Elementni savatdan o'chirish"""
     try:
-        item_id = int(callback.data.split(":")[2])
-        await cart_remove_item(item_id)
+        product_id = int(callback.data.split(":")[2])
+        await cart_remove_item(callback.from_user.id, product_id)
         await show_cart(callback.message, callback.from_user.id, edit=True)
         await callback.answer()
-    except Exception:
+    except Exception as e:
+        logger.exception(f"cart_delete error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
 @router.callback_query(F.data == "cart:clear")
 async def cart_clear_handler(callback: CallbackQuery) -> None:
-    """Savatni tozalash"""
     try:
         user = await get_user(callback.from_user.id)
         lang = user.get("language", "uz") if user else "uz"
@@ -248,13 +205,13 @@ async def cart_clear_handler(callback: CallbackQuery) -> None:
             ]])
         )
         await callback.answer()
-    except Exception:
+    except Exception as e:
+        logger.exception(f"cart_clear error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
 @router.callback_query(F.data == "cart:promo")
 async def promo_start(callback: CallbackQuery, state: FSMContext) -> None:
-    """Promo kod kiritish"""
     try:
         user = await get_user(callback.from_user.id)
         lang = user.get("language", "uz") if user else "uz"
@@ -267,13 +224,13 @@ async def promo_start(callback: CallbackQuery, state: FSMContext) -> None:
             ]])
         )
         await callback.answer()
-    except Exception:
+    except Exception as e:
+        logger.exception(f"promo_start error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
 @router.callback_query(F.data == "cart:promo_cancel", PromoFSM.code)
 async def promo_cancel(callback: CallbackQuery, state: FSMContext) -> None:
-    """Promo kod kiritishni bekor qilish"""
     await state.clear()
     await show_cart(callback.message, callback.from_user.id, edit=True)
     await callback.answer()
@@ -281,7 +238,6 @@ async def promo_cancel(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(PromoFSM.code)
 async def promo_entered(message: Message, state: FSMContext) -> None:
-    """Promo kod tekshirish"""
     data = await state.get_data()
     lang = data.get("lang", "uz")
     code = message.text.strip()
@@ -292,8 +248,7 @@ async def promo_entered(message: Message, state: FSMContext) -> None:
         promo = await get_promo_by_code(code)
 
         valid = False
-        if promo:
-            # Sana va limit tekshirish
+        if promo and promo.get("is_active"):
             now = datetime.now()
             valid_from = promo.get("valid_from")
             valid_until = promo.get("valid_until")
@@ -310,18 +265,18 @@ async def promo_entered(message: Message, state: FSMContext) -> None:
                 valid = True
 
         if valid:
-            await message.answer(t("promo_valid", lang, pct=promo["discount_percent"]))
+            await message.answer(t("promo_valid", lang, discount=promo["discount_percent"]))
             await show_cart(message, message.from_user.id, promo=promo)
         else:
             await message.answer(t("promo_invalid", lang))
             await show_cart(message, message.from_user.id)
-    except Exception:
+    except Exception as e:
+        logger.exception(f"promo_entered error: {e}")
         await message.answer(t("error_general"))
 
 
 @router.callback_query(F.data == "cart:checkout")
 async def checkout(callback: CallbackQuery, state: FSMContext) -> None:
-    """Buyurtma berish — order.py ga yo'naltirish"""
     try:
         user = await get_user(callback.from_user.id)
         lang = user.get("language", "uz") if user else "uz"
@@ -331,12 +286,11 @@ async def checkout(callback: CallbackQuery, state: FSMContext) -> None:
             await callback.answer(t("cart_empty", lang), show_alert=True)
             return
 
-        # FSM ga savat ma'lumotlarini saqlash va order yaratish
         await state.update_data(checkout_lang=lang)
         await callback.answer()
 
-        # Order handlerga yo'naltirish
         from bot.handlers.order import create_order_handler
         await create_order_handler(callback.message, callback.from_user.id, lang, state)
-    except Exception:
+    except Exception as e:
+        logger.exception(f"checkout error: {e}")
         await callback.answer(t("error_general"), show_alert=True)

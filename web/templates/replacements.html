@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% set active_page = "replacements" %}
+
+{% block title %}Almashtirishlar — IDROK.AI Admin{% endblock %}
+
+{% block breadcrumbs %}
+<span class="text-sm text-gray-500">Almashtirishlar</span>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header -->
+    <div>
+        <h1 class="text-2xl font-semibold text-gray-900">Almashtirishlar</h1>
+        <p class="text-sm text-gray-500 mt-1">Mijozlardan kelgan almashtirish so'rovlari</p>
+    </div>
+
+    <!-- Table -->
+    <div class="table-container">
+        {% if replacements %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-gray-100 bg-gray-50">
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">#</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Mijoz</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Obuna</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Sabab</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Status</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Sana</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Amallar</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    {% for rep in replacements %}
+                    <tr class="hover:bg-gray-50 transition-colors even:bg-gray-50/50">
+                        <td class="px-4 py-3 text-gray-400">{{ loop.index }}</td>
+                        <td class="px-4 py-3">
+                            <div class="font-medium text-gray-800">{{ rep.user_name or 'Foydalanuvchi' }}</div>
+                            {% if rep.username %}
+                            <div class="text-xs text-gray-400">@{{ rep.username }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="font-medium text-gray-700">{{ rep.product_name or '—' }}</div>
+                            {% if rep.old_login %}
+                            <div class="text-xs font-mono text-gray-400">{{ rep.old_login }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-gray-600 max-w-xs">
+                            <p class="truncate">{{ rep.reason or '—' }}</p>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            {% if rep.status == 'pending' %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Kutilmoqda</span>
+                            {% elif rep.status == 'approved' %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Tasdiqlandi</span>
+                            {% elif rep.status == 'rejected' %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Rad etildi</span>
+                            {% else %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ rep.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
+                            {{ rep.created_at.strftime('%d.%m.%Y %H:%M') if rep.created_at else '—' }}
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            {% if rep.status == 'pending' %}
+                            <div class="flex items-center justify-center gap-2">
+                                <form method="POST" action="/replacements/{{ rep.id }}/approve" class="inline">
+                                    <button type="submit" class="btn-success text-xs px-3 py-1.5">Tasdiqlash</button>
+                                </form>
+                                <form method="POST" action="/replacements/{{ rep.id }}/reject" class="inline"
+                                      onsubmit="return confirm('Rad etishni tasdiqlaysizmi?')">
+                                    <button type="submit" class="btn-danger text-xs px-3 py-1.5">Rad etish</button>
+                                </form>
+                            </div>
+                            {% else %}
+                            <span class="text-gray-400 text-xs">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="flex flex-col items-center justify-center py-16 text-center">
+            <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <p class="text-gray-500 font-medium">Almashtirish so'rovlari yo'q</p>
+            <p class="text-gray-400 text-sm mt-1">Mijozlar hali so'rov yuborishmagan</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

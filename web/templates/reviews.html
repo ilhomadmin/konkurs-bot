@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% set active_page = "reviews" %}
+
+{% block title %}Sharhlar — IDROK.AI Admin{% endblock %}
+
+{% block breadcrumbs %}
+<span class="text-sm text-gray-500">Sharhlar</span>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header -->
+    <div>
+        <h1 class="text-2xl font-semibold text-gray-900">Sharhlar</h1>
+        <p class="text-sm text-gray-500 mt-1">Mijozlarning baholari va izohlari</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="stat-card">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-sm font-medium text-gray-500">O'rtacha baho</span>
+                <span class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center text-yellow-600">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                </span>
+            </div>
+            <p class="text-2xl font-bold text-gray-900">{{ "%.1f"|format(average_rating or 0) }} <span class="text-sm font-normal text-gray-500">/ 5</span></p>
+        </div>
+        <div class="stat-card">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-sm font-medium text-gray-500">Jami sharhlar</span>
+                <span class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+                </span>
+            </div>
+            <p class="text-2xl font-bold text-gray-900">{{ total_reviews or 0 }}</p>
+        </div>
+    </div>
+
+    <!-- Filter -->
+    <div class="flex items-center gap-1 bg-white rounded-xl shadow-sm border border-gray-100 p-1 overflow-x-auto">
+        <a href="/reviews"
+           class="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors
+                  {% if not current_rating %}bg-indigo-600 text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %}">
+            Hammasi
+        </a>
+        {% for r in range(5, 0, -1) %}
+        <a href="/reviews?rating={{ r }}"
+           class="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors inline-flex items-center gap-1
+                  {% if current_rating == r %}bg-indigo-600 text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %}">
+            {{ r }}
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Table -->
+    <div class="table-container">
+        {% if reviews %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-gray-100 bg-gray-50">
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">#</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Foydalanuvchi</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Mahsulot</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Baho</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Izoh</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Ko'rinish</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Sana</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Amallar</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    {% for review in reviews %}
+                    <tr class="even:bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                        <td class="px-4 py-3 text-gray-400">{{ loop.index }}</td>
+                        <td class="px-4 py-3">
+                            <div class="font-medium text-gray-800">{{ review.user_name or 'Foydalanuvchi' }}</div>
+                            {% if review.username %}
+                            <div class="text-xs text-gray-400">@{{ review.username }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-gray-700">{{ review.product_name or '—' }}</td>
+                        <td class="px-4 py-3 text-center">
+                            <div class="flex items-center justify-center gap-0.5">
+                                {% for i in range(1, 6) %}
+                                <svg class="w-4 h-4 {{ 'text-yellow-400' if i <= review.rating else 'text-gray-200' }}"
+                                     fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                </svg>
+                                {% endfor %}
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 text-gray-600 max-w-xs">
+                            <p class="truncate">{{ review.comment or '—' }}</p>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            {% if review.is_visible %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Ko'rinadi</span>
+                            {% else %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Yashirin</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
+                            {{ review.created_at.strftime('%d.%m.%Y') if review.created_at else '—' }}
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="flex items-center justify-center gap-2">
+                                <form method="POST" action="/reviews/{{ review.id }}/toggle" class="inline">
+                                    <button type="submit" class="text-xs font-medium {% if review.is_visible %}text-amber-600 hover:text-amber-800{% else %}text-green-600 hover:text-green-800{% endif %}">
+                                        {% if review.is_visible %}Yashirish{% else %}Ko'rsatish{% endif %}
+                                    </button>
+                                </form>
+                                <form method="POST" action="/reviews/{{ review.id }}/delete" class="inline"
+                                      onsubmit="return confirm('Sharhni o\'chirishni tasdiqlaysizmi?')">
+                                    <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium">O'chirish</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="flex flex-col items-center justify-center py-16 text-center">
+            <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+            </svg>
+            <p class="text-gray-500 font-medium">Sharhlar yo'q</p>
+            <p class="text-gray-400 text-sm mt-1">Mijozlar hali sharh qoldirmaganlar</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

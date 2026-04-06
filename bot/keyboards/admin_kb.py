@@ -1,21 +1,18 @@
 """
 Admin panel klaviaturalari
+YANGI STRUKTURA: tier yo'q, narx product da
 """
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from bot.utils.texts import t
-from bot.utils.duration import all_tiers, tier_display_name
 
 
 def admin_main_menu_kb(lang: str = "uz", role: str = "operator") -> InlineKeyboardMarkup:
-    """Admin asosiy menyu — rolga qarab tugmalar"""
     buttons = []
 
-    # Operator va yuqori rollar uchun
     if role in ("operator", "manager", "boss"):
         buttons.append([InlineKeyboardButton(text=t("btn_admin_orders", lang), callback_data="adm:orders")])
 
-    # Manager va yuqori rollar uchun
     if role in ("manager", "boss"):
         buttons.append([InlineKeyboardButton(text=t("btn_admin_products", lang), callback_data="adm:products")])
         buttons.append([InlineKeyboardButton(
@@ -28,7 +25,6 @@ def admin_main_menu_kb(lang: str = "uz", role: str = "operator") -> InlineKeyboa
         buttons.append([InlineKeyboardButton(text=t("btn_admin_finance", lang), callback_data="adm:finance")])
         buttons.append([InlineKeyboardButton(text=t("btn_admin_broadcast", lang), callback_data="adm:broadcast")])
 
-    # Faqat boss uchun
     if role == "boss":
         buttons.append([InlineKeyboardButton(text=t("btn_admin_roles", lang), callback_data="adm:roles")])
 
@@ -36,7 +32,6 @@ def admin_main_menu_kb(lang: str = "uz", role: str = "operator") -> InlineKeyboa
 
 
 def products_menu_kb(lang: str = "uz") -> InlineKeyboardMarkup:
-    """Mahsulotlar boshqarish menyusi"""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=t("btn_categories", lang), callback_data="adm:cat:list")],
@@ -46,16 +41,12 @@ def products_menu_kb(lang: str = "uz") -> InlineKeyboardMarkup:
 
 
 def categories_list_kb(categories: list[dict], lang: str = "uz") -> InlineKeyboardMarkup:
-    """Kategoriyalar ro'yxati klaviaturasi"""
     buttons = []
     for cat in categories:
-        name = cat[f"name_{lang}"]
+        name = cat.get(f"name_{lang}", cat.get("name_uz", "?"))
         status = "" if cat["is_active"] else " 🔴"
         buttons.append([
-            InlineKeyboardButton(
-                text=f"{name}{status}",
-                callback_data=f"adm:cat:{cat['id']}"
-            )
+            InlineKeyboardButton(text=f"{name}{status}", callback_data=f"adm:cat:{cat['id']}")
         ])
     buttons.append([InlineKeyboardButton(text=t("btn_add_category", lang), callback_data="adm:cat:add")])
     buttons.append([InlineKeyboardButton(text=t("btn_back", lang), callback_data="adm:products")])
@@ -63,10 +54,9 @@ def categories_list_kb(categories: list[dict], lang: str = "uz") -> InlineKeyboa
 
 
 def category_actions_kb(category_id: int, lang: str = "uz") -> InlineKeyboardMarkup:
-    """Kategoriya amallari (tahrirlash, o'chirish)"""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="📦 Mahsulotlar" if lang == "uz" else "📦 Товары",
+            [InlineKeyboardButton(text="📦 Obuna turlari" if lang == "uz" else "📦 Подписки",
                                   callback_data=f"adm:prod:list:{category_id}")],
             [InlineKeyboardButton(text=t("btn_toggle_active", lang),
                                   callback_data=f"adm:cat:toggle:{category_id}")],
@@ -78,7 +68,6 @@ def category_actions_kb(category_id: int, lang: str = "uz") -> InlineKeyboardMar
 
 
 def confirm_delete_kb(confirm_data: str, lang: str = "uz") -> InlineKeyboardMarkup:
-    """Tasdiqlash/bekor qilish klaviaturasi"""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -90,34 +79,27 @@ def confirm_delete_kb(confirm_data: str, lang: str = "uz") -> InlineKeyboardMark
 
 
 def products_list_kb(products: list[dict], category_id: int, lang: str = "uz") -> InlineKeyboardMarkup:
-    """Mahsulotlar ro'yxati klaviaturasi"""
     buttons = []
     for prod in products:
-        name = prod[f"name_{lang}"]
+        name = prod.get(f"name_{lang}", prod.get("name_uz", "?"))
+        price = prod.get("price", 0)
         status = "" if prod["is_active"] else " 🔴"
         buttons.append([
             InlineKeyboardButton(
-                text=f"{name}{status}",
+                text=f"{name} — {price:,}{status}",
                 callback_data=f"adm:prod:{prod['id']}"
             )
         ])
     buttons.append([
-        InlineKeyboardButton(
-            text=t("btn_add_product", lang),
-            callback_data=f"adm:prod:add:{category_id}"
-        )
+        InlineKeyboardButton(text=t("btn_add_product", lang), callback_data=f"adm:prod:add:{category_id}")
     ])
-    buttons.append([InlineKeyboardButton(text=t("btn_back", lang),
-                                          callback_data=f"adm:cat:{category_id}")])
+    buttons.append([InlineKeyboardButton(text=t("btn_back", lang), callback_data=f"adm:cat:{category_id}")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def product_actions_kb(product_id: int, lang: str = "uz") -> InlineKeyboardMarkup:
-    """Mahsulot amallari klaviaturasi"""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="💰 Narxlar" if lang == "uz" else "💰 Цены",
-                                  callback_data=f"adm:price:list:{product_id}")],
             [InlineKeyboardButton(text="📊 Akkauntlar" if lang == "uz" else "📊 Аккаунты",
                                   callback_data=f"adm:acc:list:{product_id}")],
             [InlineKeyboardButton(text=t("btn_toggle_active", lang),
@@ -130,45 +112,7 @@ def product_actions_kb(product_id: int, lang: str = "uz") -> InlineKeyboardMarku
     )
 
 
-def prices_list_kb(prices: list[dict], product_id: int, lang: str = "uz") -> InlineKeyboardMarkup:
-    """Narx tierlari ro'yxati"""
-    buttons = []
-    for price in prices:
-        name = price[f"display_name_{lang}"]
-        buttons.append([
-            InlineKeyboardButton(
-                text=f"{name} — {price['price']:,} so'm",
-                callback_data=f"adm:price:{price['id']}"
-            )
-        ])
-    buttons.append([
-        InlineKeyboardButton(text=t("btn_add_price", lang),
-                             callback_data=f"adm:price:add:{product_id}")
-    ])
-    buttons.append([InlineKeyboardButton(text=t("btn_back", lang),
-                                          callback_data=f"adm:prod:{product_id}")])
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
-
-
-def tier_select_kb(lang: str = "uz", product_id: int = 0) -> InlineKeyboardMarkup:
-    """Tier tanlash klaviaturasi (narx qo'shishda)"""
-    buttons = []
-    from bot.utils.duration import TIER_DISPLAY
-    for tier in all_tiers():
-        display = TIER_DISPLAY[tier][lang]
-        buttons.append([
-            InlineKeyboardButton(
-                text=display,
-                callback_data=f"adm:tier:{tier}:{product_id}"
-            )
-        ])
-    buttons.append([InlineKeyboardButton(text=t("btn_back", lang),
-                                          callback_data=f"adm:prod:{product_id}")])
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
-
-
 def accounts_menu_kb(product_id: int, lang: str = "uz") -> InlineKeyboardMarkup:
-    """Akkauntlar boshqarish menyusi"""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=t("btn_add_account", lang),
@@ -182,7 +126,6 @@ def accounts_menu_kb(product_id: int, lang: str = "uz") -> InlineKeyboardMarkup:
 
 
 def roles_list_kb(admins: list[dict], lang: str = "uz") -> InlineKeyboardMarkup:
-    """Adminlar ro'yxati klaviaturasi"""
     buttons = []
     role_labels = {"operator": "🔧", "manager": "📊", "boss": "👑"}
     for admin in admins:
@@ -201,7 +144,6 @@ def roles_list_kb(admins: list[dict], lang: str = "uz") -> InlineKeyboardMarkup:
 
 
 def role_select_kb(target_id: int, lang: str = "uz") -> InlineKeyboardMarkup:
-    """Rol tanlash klaviaturasi"""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🔧 Operator", callback_data=f"adm:role:set:{target_id}:operator")],

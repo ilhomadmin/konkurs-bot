@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% set active_page = "categories" %}
+
+{% block title %}{% if category %}Tahrirlash — {{ category.name_uz }}{% else %}Yangi turkum{% endif %} — IDROK.AI Admin{% endblock %}
+
+{% block breadcrumbs %}
+<a href="/categories" class="text-gray-400 text-sm hover:text-gray-600">Turkumlar</a>
+<svg class="w-4 h-4 text-gray-300 mx-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+</svg>
+<span class="text-gray-700 text-sm font-medium">{% if category %}Tahrirlash{% else %}Yangi{% endif %}</span>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl space-y-6">
+  <div>
+    <h1 class="text-2xl font-semibold text-gray-900">
+      {% if category %}{{ category.name_uz }} ni tahrirlash{% else %}Yangi turkum{% endif %}
+    </h1>
+    <p class="text-sm text-gray-500 mt-1">Turkum ma'lumotlarini to'ldiring</p>
+  </div>
+
+  <form method="POST" action="{% if category %}/categories/{{ category.id }}{% else %}/categories/add{% endif %}"
+        class="bg-white rounded-xl shadow-sm border border-gray-100 divide-y divide-gray-100">
+
+    <!-- Names -->
+    <div class="p-6 space-y-4">
+      <h2 class="text-base font-semibold text-gray-800">Nomlar</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="label" for="name_uz">Nom (O'zbek) <span class="text-red-500">*</span></label>
+          <input id="name_uz" name="name_uz" type="text" required class="input-field"
+                 placeholder="masalan: Streaming"
+                 value="{{ category.name_uz if category else '' }}">
+        </div>
+        <div>
+          <label class="label" for="name_ru">Nom (Rus)</label>
+          <input id="name_ru" name="name_ru" type="text" class="input-field"
+                 placeholder="masalan: Стриминг"
+                 value="{{ category.name_ru if category else '' }}">
+        </div>
+      </div>
+    </div>
+
+    <!-- Descriptions -->
+    <div class="p-6 space-y-4">
+      <h2 class="text-base font-semibold text-gray-800">Tavsif</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="label" for="description_uz">Tavsif (O'zbek)</label>
+          <textarea id="description_uz" name="description_uz" rows="3" class="input-field resize-y"
+                    placeholder="Turkum haqida...">{{ category.description_uz if category else '' }}</textarea>
+        </div>
+        <div>
+          <label class="label" for="description_ru">Tavsif (Rus)</label>
+          <textarea id="description_ru" name="description_ru" rows="3" class="input-field resize-y"
+                    placeholder="Описание категории...">{{ category.description_ru if category else '' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Extra settings -->
+    <div class="p-6 space-y-4">
+      <h2 class="text-base font-semibold text-gray-800">Qo'shimcha</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="label" for="video_keyword">Video kalit so'z</label>
+          <input id="video_keyword" name="video_keyword" type="text" class="input-field font-mono"
+                 placeholder="masalan: streaming_guide"
+                 value="{{ category.video_keyword if category else '' }}">
+          <p class="text-xs text-gray-400 mt-1">Bot video yuborish uchun ishlatadi</p>
+        </div>
+        <div>
+          <label class="label" for="sort_order">Tartib raqami</label>
+          <input id="sort_order" name="sort_order" type="number" min="0" class="input-field"
+                 placeholder="0"
+                 value="{{ category.sort_order if category else '0' }}">
+          <p class="text-xs text-gray-400 mt-1">Kichik raqam — yuqorida ko'rinadi</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="px-6 py-4 bg-gray-50 flex items-center justify-between rounded-b-xl">
+      <a href="/categories" class="btn-secondary">Bekor qilish</a>
+      <button type="submit" class="btn-primary">
+        {% if category %}Saqlash{% else %}Qo'shish{% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
