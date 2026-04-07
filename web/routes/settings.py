@@ -56,8 +56,7 @@ async def settings_list(request: Request):
         })
     except Exception:
         logger.exception("Sozlamalarni yuklashda xato")
-        return templates.TemplateResponse("settings.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "settings.html", {
             "admin": admin,
             "grouped_settings": {},
             "category_labels": CATEGORY_LABELS,
