@@ -110,8 +110,7 @@ async def finance_dashboard(request: Request):
         })
     except Exception:
         logger.exception("Moliya dashboardini yuklashda xato")
-        return templates.TemplateResponse("finance.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "finance.html", {
             "admin": admin,
             "stats": {},
             "expenses": [],

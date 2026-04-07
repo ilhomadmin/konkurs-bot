@@ -53,7 +53,9 @@
     <!-- Chart -->
     <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-5">
         <h3 class="text-sm font-semibold text-gray-900 mb-4">7 kunlik daromad</h3>
-        <canvas id="revenueChart" height="200"></canvas>
+        <div style="position:relative; height:280px; overflow:hidden;">
+            <canvas id="revenueChart"></canvas>
+        </div>
     </div>
 
     <!-- Alerts -->
@@ -72,13 +74,13 @@
                 <span class="text-sm text-yellow-700">To'lov kutilayotgan buyurtmalar</span>
             </a>
             {% endif %}
-            {% for item in stats.low_stock %}
+            {% for item in low_stock | default([]) %}
             <div class="flex items-center gap-3 p-3 bg-orange-50 rounded-lg">
                 <span class="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 text-sm font-bold">{{ item.cnt }}</span>
                 <span class="text-sm text-orange-700">{{ item.name_uz }} — kam stok</span>
             </div>
             {% endfor %}
-            {% if not stats.pending_replacements and not stats.pending_orders and not stats.low_stock %}
+            {% if not stats.pending_replacements and not stats.pending_orders and not low_stock %}
             <p class="text-sm text-gray-400 text-center py-4">Hozircha ogohlantirish yo'q</p>
             {% endif %}
         </div>
@@ -153,14 +155,22 @@ new Chart(ctx, {
     options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom' } },
+        plugins: {
+            legend: { position: 'bottom' }
+        },
         scales: {
             y: {
                 beginAtZero: true,
                 ticks: {
-                    callback: function(value) { return value.toLocaleString() + " so'm"; }
+                    maxTicksLimit: 5,
+                    callback: function(value) {
+                        if (value >= 1000000) return (value/1000000).toFixed(1) + 'M';
+                        if (value >= 1000) return (value/1000).toFixed(0) + 'K';
+                        return value;
+                    }
                 }
-            }
+            },
+            x: { grid: { display: false } }
         }
     }
 });
