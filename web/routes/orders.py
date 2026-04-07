@@ -55,8 +55,7 @@ async def orders_list(request: Request):
             """, params)
             orders = [dict(r) for r in await cursor.fetchall()]
 
-        return templates.TemplateResponse("orders/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "orders.html", {
             "admin": admin,
             "orders": orders,
             "filter_status": status_filter,
@@ -64,8 +63,7 @@ async def orders_list(request: Request):
         })
     except Exception:
         logger.exception("Buyurtmalar ro'yxatini yuklashda xato")
-        return templates.TemplateResponse("orders/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "orders.html", {
             "admin": admin,
             "orders": [],
             "filter_status": "",
@@ -105,8 +103,7 @@ async def order_detail(request: Request, order_id: int):
             """, (order_id,))
             items = [dict(r) for r in await cursor2.fetchall()]
 
-        return templates.TemplateResponse("orders/detail.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "order_detail.html", {
             "admin": admin,
             "order": order,
             "items": items,

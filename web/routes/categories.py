@@ -38,15 +38,13 @@ async def categories_list(request: Request):
             """)
             categories = [dict(r) for r in await cursor.fetchall()]
 
-        return templates.TemplateResponse("categories/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "categories.html", {
             "admin": admin,
             "categories": categories,
         })
     except Exception:
         logger.exception("Kategoriyalar ro'yxatini yuklashda xato")
-        return templates.TemplateResponse("categories/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "categories.html", {
             "admin": admin,
             "categories": [],
             "error": "Xato yuz berdi",
@@ -99,8 +97,7 @@ async def categories_edit_form(request: Request, category_id: int):
                 return RedirectResponse("/categories?error=not_found", status_code=302)
             category = dict(row)
 
-        return templates.TemplateResponse("categories/form.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "category_form.html", {
             "admin": admin,
             "category": category,
         })

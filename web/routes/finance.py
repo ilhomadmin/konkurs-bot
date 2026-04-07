@@ -101,8 +101,7 @@ async def finance_dashboard(request: Request):
             "period_days": days,
         }
 
-        return templates.TemplateResponse("finance/dashboard.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "finance.html", {
             "admin": admin,
             "stats": stats,
             "expenses": expenses,
@@ -111,7 +110,7 @@ async def finance_dashboard(request: Request):
         })
     except Exception:
         logger.exception("Moliya dashboardini yuklashda xato")
-        return templates.TemplateResponse("finance/dashboard.html", {
+        return templates.TemplateResponse("finance.html", {
             "request": request,
             "admin": admin,
             "stats": {},

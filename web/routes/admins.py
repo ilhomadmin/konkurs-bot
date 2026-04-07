@@ -35,16 +35,14 @@ async def admins_list(request: Request):
             )
             admins = [dict(r) for r in await cursor.fetchall()]
 
-        return templates.TemplateResponse("admins/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "admins.html", {
             "admin": admin,
             "admins": admins,
             "roles": ROLES,
         })
     except Exception:
         logger.exception("Adminlar ro'yxatini yuklashda xato")
-        return templates.TemplateResponse("admins/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "admins.html", {
             "admin": admin,
             "admins": [],
             "roles": ROLES,

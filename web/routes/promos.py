@@ -34,15 +34,13 @@ async def promos_list(request: Request):
             """)
             promos = [dict(r) for r in await cursor.fetchall()]
 
-        return templates.TemplateResponse("promos/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "promos.html", {
             "admin": admin,
             "promos": promos,
         })
     except Exception:
         logger.exception("Promo kodlar ro'yxatini yuklashda xato")
-        return templates.TemplateResponse("promos/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "promos.html", {
             "admin": admin,
             "promos": [],
             "error": "Xato yuz berdi",

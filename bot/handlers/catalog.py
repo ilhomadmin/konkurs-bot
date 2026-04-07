@@ -11,7 +11,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from bot.db.models import (
     get_all_categories, get_category_by_id,
     get_products_by_category, get_all_products, get_product_by_id,
-    get_product_stock, get_product_avg_rating,
+    get_product_stock, get_product_rating,
     is_in_favorites, add_to_favorites, remove_from_favorites,
     add_stock_notification, cart_get, cart_add, get_user,
 )
@@ -285,7 +285,8 @@ async def product_detail(callback: CallbackQuery) -> None:
             cat_id = str(prod["category_id"])
 
         stock = await get_product_stock(product_id)
-        rating = await get_product_avg_rating(product_id)
+        rating_data = await get_product_rating(product_id)
+        rating = rating_data.get("avg", 0)
         fav = await is_in_favorites(user["id"], product_id) if user else False
 
         # Product card
@@ -300,7 +301,8 @@ async def product_detail(callback: CallbackQuery) -> None:
         if stock > 0:
             lines.append(f"📊 {'Mavjud' if lang == 'uz' else 'В наличии'}: <b>{stock}</b> ta")
         else:
-            lines.append(f"❌ {'Hozircha yo\\'q' if lang == 'uz' else 'Нет в наличии'}")
+            no_stock = "Hozircha yo'q" if lang == 'uz' else 'Нет в наличии'
+            lines.append(f"❌ {no_stock}")
 
         if prod.get("purchase_count", 0) > 0:
             lines.append(f"🔥 {prod['purchase_count']} {'marta sotilgan' if lang == 'uz' else 'раз продано'}")

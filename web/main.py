@@ -46,7 +46,7 @@ async def login_page(request: Request):
     admin = get_current_admin(request)
     if admin:
         return RedirectResponse("/", status_code=302)
-    return templates.TemplateResponse("login.html", {"request": request, "error": None})
+    return templates.TemplateResponse(request, "login.html", {"error": None})
 
 
 @app.post("/login")
@@ -60,19 +60,19 @@ async def login_submit(request: Request, username: str = Form(...), password: st
         admin = await cursor.fetchone()
 
     if not admin:
-        return templates.TemplateResponse("login.html", {
-            "request": request, "error": "Foydalanuvchi topilmadi"
+        return templates.TemplateResponse(request, "login.html", {
+            "error": "Foydalanuvchi topilmadi"
         })
 
     admin = dict(admin)
     if not admin.get("password_hash"):
-        return templates.TemplateResponse("login.html", {
-            "request": request, "error": "Parol o'rnatilmagan. Bot orqali /admin dan parol o'rnating."
+        return templates.TemplateResponse(request, "login.html", {
+            "error": "Parol o'rnatilmagan. Bot orqali /admin dan parol o'rnating."
         })
 
     if not verify_password(password, admin["password_hash"]):
-        return templates.TemplateResponse("login.html", {
-            "request": request, "error": "Noto'g'ri parol"
+        return templates.TemplateResponse(request, "login.html", {
+            "error": "Noto'g'ri parol"
         })
 
     token = create_token(admin["telegram_id"], admin["role"])

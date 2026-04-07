@@ -42,16 +42,14 @@ async def bundles_list(request: Request):
             )
             products = [dict(r) for r in await cursor2.fetchall()]
 
-        return templates.TemplateResponse("bundles/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "bundles.html", {
             "admin": admin,
             "bundles": bundles,
             "products": products,
         })
     except Exception:
         logger.exception("To'plamlar ro'yxatini yuklashda xato")
-        return templates.TemplateResponse("bundles/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "bundles.html", {
             "admin": admin,
             "bundles": [],
             "products": [],

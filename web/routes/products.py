@@ -45,16 +45,14 @@ async def products_list(request: Request):
             cursor2 = await db.execute("SELECT * FROM categories WHERE is_active = 1 ORDER BY sort_order, id")
             categories = [dict(r) for r in await cursor2.fetchall()]
 
-        return templates.TemplateResponse("products/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "products.html", {
             "admin": admin,
             "products": products,
             "categories": categories,
         })
     except Exception:
         logger.exception("Mahsulotlar ro'yxatini yuklashda xato")
-        return templates.TemplateResponse("products/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "products.html", {
             "admin": admin,
             "products": [],
             "categories": [],
@@ -74,8 +72,7 @@ async def products_add_form(request: Request):
             cursor = await db.execute("SELECT * FROM categories WHERE is_active = 1 ORDER BY sort_order, id")
             categories = [dict(r) for r in await cursor.fetchall()]
 
-        return templates.TemplateResponse("products/form.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "product_form.html", {
             "admin": admin,
             "categories": categories,
             "product": None,
@@ -147,8 +144,7 @@ async def products_edit_form(request: Request, product_id: int):
             cursor2 = await db.execute("SELECT * FROM categories ORDER BY sort_order, id")
             categories = [dict(r) for r in await cursor2.fetchall()]
 
-        return templates.TemplateResponse("products/form.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "product_form.html", {
             "admin": admin,
             "product": product,
             "categories": categories,

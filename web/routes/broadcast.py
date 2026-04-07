@@ -36,15 +36,13 @@ async def broadcast_form(request: Request):
             row = await cursor.fetchone()
             user_count = row["cnt"] if row else 0
 
-        return templates.TemplateResponse("broadcast/form.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "broadcast.html", {
             "admin": admin,
             "user_count": user_count,
         })
     except Exception:
         logger.exception("Broadcast formasini yuklashda xato")
-        return templates.TemplateResponse("broadcast/form.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "broadcast.html", {
             "admin": admin,
             "user_count": 0,
             "error": "Xato yuz berdi",

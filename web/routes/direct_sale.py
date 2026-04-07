@@ -60,8 +60,7 @@ async def direct_sale_form(request: Request):
             """)
             direct_links = [dict(r) for r in await cursor3.fetchall()]
 
-        return templates.TemplateResponse("direct_sale/form.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "direct_sale.html", {
             "admin": admin,
             "products": products,
             "available_account": available_account,
@@ -70,8 +69,7 @@ async def direct_sale_form(request: Request):
         })
     except Exception:
         logger.exception("To'g'ridan-to'g'ri sotuv formasini yuklashda xato")
-        return templates.TemplateResponse("direct_sale/form.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "direct_sale.html", {
             "admin": admin,
             "products": [],
             "available_account": None,

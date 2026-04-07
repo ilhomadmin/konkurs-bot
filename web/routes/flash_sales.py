@@ -41,16 +41,14 @@ async def flash_sales_list(request: Request):
             )
             products = [dict(r) for r in await cursor2.fetchall()]
 
-        return templates.TemplateResponse("flash_sales/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "flash_sales.html", {
             "admin": admin,
             "flash_sales": flash_sales,
             "products": products,
         })
     except Exception:
         logger.exception("Flash sale ro'yxatini yuklashda xato")
-        return templates.TemplateResponse("flash_sales/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "flash_sales.html", {
             "admin": admin,
             "flash_sales": [],
             "products": [],
