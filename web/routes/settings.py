@@ -49,15 +49,14 @@ async def settings_list(request: Request):
         for s in all_settings:
             grouped[s["category"]].append(s)
 
-        return templates.TemplateResponse("settings/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "settings.html", {
             "admin": admin,
             "grouped_settings": dict(grouped),
             "category_labels": CATEGORY_LABELS,
         })
     except Exception:
         logger.exception("Sozlamalarni yuklashda xato")
-        return templates.TemplateResponse("settings/list.html", {
+        return templates.TemplateResponse("settings.html", {
             "request": request,
             "admin": admin,
             "grouped_settings": {},

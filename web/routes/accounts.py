@@ -60,8 +60,7 @@ async def accounts_list(request: Request):
             cursor2 = await db.execute("SELECT id, name_uz FROM products ORDER BY name_uz")
             products = [dict(r) for r in await cursor2.fetchall()]
 
-        return templates.TemplateResponse("accounts/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "accounts.html", {
             "admin": admin,
             "accounts": accounts,
             "products": products,
@@ -70,8 +69,7 @@ async def accounts_list(request: Request):
         })
     except Exception:
         logger.exception("Akkauntlar ro'yxatini yuklashda xato")
-        return templates.TemplateResponse("accounts/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "accounts.html", {
             "admin": admin,
             "accounts": [],
             "products": [],

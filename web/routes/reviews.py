@@ -58,8 +58,7 @@ async def reviews_list(request: Request):
             cursor2 = await db.execute("SELECT id, name_uz FROM products ORDER BY name_uz")
             products = [dict(r) for r in await cursor2.fetchall()]
 
-        return templates.TemplateResponse("reviews/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "reviews.html", {
             "admin": admin,
             "reviews": reviews,
             "products": products,
@@ -68,8 +67,7 @@ async def reviews_list(request: Request):
         })
     except Exception:
         logger.exception("Sharhlar ro'yxatini yuklashda xato")
-        return templates.TemplateResponse("reviews/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "reviews.html", {
             "admin": admin,
             "reviews": [],
             "products": [],

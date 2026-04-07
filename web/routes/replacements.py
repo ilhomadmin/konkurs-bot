@@ -54,16 +54,14 @@ async def replacements_list(request: Request):
             """, params)
             replacements = [dict(r) for r in await cursor.fetchall()]
 
-        return templates.TemplateResponse("replacements/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "replacements.html", {
             "admin": admin,
             "replacements": replacements,
             "filter_status": status_filter,
         })
     except Exception:
         logger.exception("Almashtirish so'rovlarini yuklashda xato")
-        return templates.TemplateResponse("replacements/list.html", {
-            "request": request,
+        return templates.TemplateResponse(request, "replacements.html", {
             "admin": admin,
             "replacements": [],
             "filter_status": status_filter,
