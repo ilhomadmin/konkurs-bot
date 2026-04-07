@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% set active_page = "broadcast" %}
+
+{% block title %}Broadcast — IDROK.AI Admin{% endblock %}
+
+{% block breadcrumbs %}
+<span class="text-sm text-gray-500">Broadcast</span>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="{
+    messageUz: '',
+    messageRu: '',
+    target: 'all',
+    showPreview: false,
+    confirmSend: false
+}">
+
+    <!-- Header -->
+    <div>
+        <h1 class="text-2xl font-semibold text-gray-900">Broadcast xabar</h1>
+        <p class="text-sm text-gray-500 mt-1">Barcha foydalanuvchilarga xabar yuborish</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="stat-card">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-sm font-medium text-gray-500">Jami foydalanuvchilar</span>
+                <span class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </span>
+            </div>
+            <p class="text-2xl font-bold text-gray-900">{{ total_users or 0 }}</p>
+        </div>
+        <div class="stat-card">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-sm font-medium text-gray-500">Oxirgi broadcast</span>
+                <span class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center text-green-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </span>
+            </div>
+            <p class="text-lg font-bold text-gray-900">{{ last_broadcast_date or 'Hali yuborilmagan' }}</p>
+        </div>
+    </div>
+
+    <!-- Broadcast form -->
+    <form method="POST" action="/broadcast" enctype="multipart/form-data" id="broadcastForm"
+          @submit.prevent="confirmSend = true">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-5">
+            <h2 class="text-base font-semibold text-gray-800">Yangi broadcast</h2>
+
+            <div>
+                <label class="label" for="target">Maqsadli guruh <span class="text-red-500">*</span></label>
+                <select id="target" name="target" x-model="target" class="input-field w-full max-w-xs">
+                    <option value="all">Barcha foydalanuvchilar</option>
+                    <option value="vip_only">Faqat VIP</option>
+                    <option value="active_30d">Oxirgi 30 kunda faol</option>
+                </select>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div>
+                    <label class="label" for="message_uz">Xabar (O'zbekcha) <span class="text-red-500">*</span></label>
+                    <textarea id="message_uz" name="message_uz" rows="6" required
+                              x-model="messageUz"
+                              class="input-field" placeholder="O'zbek tilidagi xabar..."></textarea>
+                </div>
+                <div>
+                    <label class="label" for="message_ru">Xabar (Ruscha)</label>
+                    <textarea id="message_ru" name="message_ru" rows="6"
+                              x-model="messageRu"
+                              class="input-field" placeholder="Сообщение на русском языке..."></textarea>
+                </div>
+            </div>
+
+            <div>
+                <label class="label" for="photo">Rasm (ixtiyoriy)</label>
+                <input id="photo" name="photo" type="file" accept="image/*"
+                       class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+            </div>
+
+            <!-- Preview -->
+            <div>
+                <button type="button" @click="showPreview = !showPreview" class="btn-secondary text-xs inline-flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    Ko'rib chiqish
+                </button>
+                <div x-show="showPreview" x-cloak class="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <p class="text-xs text-gray-400 mb-2 font-medium">O'zbekcha:</p>
+                        <div class="bg-white rounded-lg p-3 shadow-sm border text-sm text-gray-800 whitespace-pre-wrap min-h-[4rem]"
+                             x-text="messageUz || 'Xabar matni...'"></div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <p class="text-xs text-gray-400 mb-2 font-medium">Ruscha:</p>
+                        <div class="bg-white rounded-lg p-3 shadow-sm border text-sm text-gray-800 whitespace-pre-wrap min-h-[4rem]"
+                             x-text="messageRu || 'Текст сообщения...'"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3 pt-2 border-t border-gray-100">
+                <button type="submit" class="btn-primary inline-flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                    Yuborish
+                </button>
+                <span class="text-xs text-gray-400">
+                    Maqsad: <span x-text="target === 'all' ? 'Barcha foydalanuvchilar' : target === 'vip_only' ? 'Faqat VIP' : 'Faol (30 kun)'" class="font-medium text-gray-600"></span>
+                </span>
+            </div>
+        </div>
+    </form>
+
+    <!-- Confirmation modal -->
+    <div x-show="confirmSend" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-gray-600 bg-opacity-50">
+        <div class="bg-white rounded-xl shadow-xl p-6 max-w-sm mx-4" @click.away="confirmSend = false">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center text-amber-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                </span>
+                <h3 class="text-lg font-semibold text-gray-900">Tasdiqlash</h3>
+            </div>
+            <p class="text-sm text-gray-600 mb-5">Broadcast xabarni yuborishni tasdiqlaysizmi? Bu amal barcha maqsadli foydalanuvchilarga xabar yuboradi.</p>
+            <div class="flex items-center justify-end gap-2">
+                <button @click="confirmSend = false" class="btn-secondary">Bekor qilish</button>
+                <button @click="confirmSend = false; document.getElementById('broadcastForm').submit()" class="btn-danger">Yuborish</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

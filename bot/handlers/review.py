@@ -4,7 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.filters import Command
 
-from bot.db.models import get_user_by_telegram_id, create_review, get_order_item_by_id
+from bot.db.models import get_user, create_review
 from bot.utils.texts import t
 
 router = Router()
@@ -22,7 +22,7 @@ async def review_rate(call: CallbackQuery, state: FSMContext):
     order_item_id = int(parts[1])
     rating = int(parts[2])
 
-    user = await get_user_by_telegram_id(call.from_user.id)
+    user = await get_user(call.from_user.id)
     lang = user.get("language", "uz") if user else "uz"
 
     await state.update_data(order_item_id=order_item_id, rating=rating)
@@ -41,11 +41,14 @@ async def review_rate(call: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "review_skip")
 async def review_skip(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
-    user = await get_user_by_telegram_id(call.from_user.id)
+    user = await get_user(call.from_user.id)
     lang = user.get("language", "uz") if user else "uz"
 
-    item = await get_order_item_by_id(data["order_item_id"])
-    product_id = item["product_id"] if item else 0
+    from bot.db.database import get_db
+    async with get_db() as db:
+        cursor = await db.execute("SELECT product_id FROM order_items WHERE id = ?", (data["order_item_id"],))
+        row = await cursor.fetchone()
+    product_id = dict(row)["product_id"] if row else 0
     await create_review(
         user_telegram_id=call.from_user.id,
         product_id=product_id,
@@ -60,12 +63,15 @@ async def review_skip(call: CallbackQuery, state: FSMContext):
 
 @router.message(ReviewFSM.enter_comment)
 async def review_comment(message: Message, state: FSMContext):
-    user = await get_user_by_telegram_id(message.from_user.id)
+    user = await get_user(message.from_user.id)
     lang = user.get("language", "uz") if user else "uz"
     data = await state.get_data()
 
-    item = await get_order_item_by_id(data["order_item_id"])
-    product_id = item["product_id"] if item else 0
+    from bot.db.database import get_db
+    async with get_db() as db:
+        cursor = await db.execute("SELECT product_id FROM order_items WHERE id = ?", (data["order_item_id"],))
+        row = await cursor.fetchone()
+    product_id = dict(row)["product_id"] if row else 0
     await create_review(
         user_telegram_id=message.from_user.id,
         product_id=product_id,

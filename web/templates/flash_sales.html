@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% set active_page = "flash_sales" %}
+
+{% block title %}Flash Sale — IDROK.AI Admin{% endblock %}
+
+{% block breadcrumbs %}
+<span class="text-sm text-gray-500">Flash Sale</span>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="{ showAdd: false }">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-semibold text-gray-900">Flash Sale</h1>
+            <p class="text-sm text-gray-500 mt-1">Vaqtinchalik chegirmali aksiyalar</p>
+        </div>
+        <button @click="showAdd = !showAdd" class="btn-primary inline-flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Yangi aksiya
+        </button>
+    </div>
+
+    <!-- Add form -->
+    <div x-show="showAdd" x-cloak class="bg-white rounded-xl shadow-sm border border-indigo-100 p-6">
+        <h2 class="text-base font-semibold text-gray-800 mb-4">Yangi aksiya yaratish</h2>
+        <form method="POST" action="/flash-sales/add" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+                <label class="label" for="fs_product_id">Mahsulot <span class="text-red-500">*</span></label>
+                <select id="fs_product_id" name="product_id" required class="input-field">
+                    <option value="">Tanlang</option>
+                    {% for p in products %}
+                    <option value="{{ p.id }}">{{ p.name_uz }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="label" for="fs_discount">Chegirma % <span class="text-red-500">*</span></label>
+                <input id="fs_discount" name="discount_percent" type="number" required min="1" max="100" class="input-field" placeholder="0">
+            </div>
+            <div>
+                <label class="label" for="fs_starts_at">Boshlanish vaqti <span class="text-red-500">*</span></label>
+                <input id="fs_starts_at" name="starts_at" type="datetime-local" required class="input-field">
+            </div>
+            <div>
+                <label class="label" for="fs_ends_at">Tugash vaqti <span class="text-red-500">*</span></label>
+                <input id="fs_ends_at" name="ends_at" type="datetime-local" required class="input-field">
+            </div>
+            <div class="sm:col-span-2 lg:col-span-3 flex justify-end gap-2">
+                <button type="button" @click="showAdd = false" class="btn-secondary">Bekor qilish</button>
+                <button type="submit" class="btn-primary">Yaratish</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Table -->
+    <div class="table-container">
+        {% if flash_sales %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-gray-100 bg-gray-50">
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">#</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Mahsulot</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Chegirma %</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Boshlanish</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Tugash</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Status</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Amallar</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    {% for sale in flash_sales %}
+                    <tr class="even:bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                        <td class="px-4 py-3 text-gray-400">{{ loop.index }}</td>
+                        <td class="px-4 py-3 font-medium text-gray-800">{{ sale.product_name or '—' }}</td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">-{{ sale.discount_percent }}%</span>
+                        </td>
+                        <td class="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{{ sale.starts_at or '—' }}</td>
+                        <td class="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{{ sale.ends_at or '—' }}</td>
+                        <td class="px-4 py-3 text-center">
+                            {% if sale.status == 'active' %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Active</span>
+                            {% elif sale.status == 'expired' %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Expired</span>
+                            {% elif sale.status == 'scheduled' %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Scheduled</span>
+                            {% else %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ sale.status or '—' }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="flex items-center justify-center gap-2">
+                                <a href="/flash-sales/{{ sale.id }}/edit" class="text-indigo-600 hover:text-indigo-800 text-xs font-medium">Tahrir</a>
+                                <form method="POST" action="/flash-sales/{{ sale.id }}/delete" class="inline"
+                                      onsubmit="return confirm('Aksiyani o\'chirishni tasdiqlaysizmi?')">
+                                    <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium">O'chirish</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="flex flex-col items-center justify-center py-16 text-center">
+            <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            <p class="text-gray-500 font-medium">Flash Sale yo'q</p>
+            <p class="text-gray-400 text-sm mt-1">Yangi aksiya yarating</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

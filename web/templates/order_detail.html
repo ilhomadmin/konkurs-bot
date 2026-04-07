@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% set active_page = "orders" %}
+
+{% block title %}Buyurtma #{{ order.id }} — IDROK.AI Admin{% endblock %}
+
+{% block breadcrumbs %}
+<a href="/orders" class="text-gray-400 text-sm hover:text-gray-600">Buyurtmalar</a>
+<svg class="w-4 h-4 text-gray-300 mx-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+</svg>
+<span class="text-gray-700 text-sm font-medium">Buyurtma #{{ order.id }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-4xl">
+
+    <!-- Order info cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="stat-card">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Buyurtma ID</p>
+            <p class="text-xl font-bold text-gray-900">#{{ order.id }}</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Summa</p>
+            <p class="text-xl font-bold text-indigo-600">{{ "{:,}".format(order.total_amount|int) }} so'm</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</p>
+            {% if order.status == 'pending' %}
+            <span class="inline-flex px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-700">Kutilmoqda</span>
+            {% elif order.status == 'confirmed' %}
+            <span class="inline-flex px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-700">Tasdiqlangan</span>
+            {% elif order.status == 'delivered' %}
+            <span class="inline-flex px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">Yetkazildi</span>
+            {% elif order.status == 'cancelled' %}
+            <span class="inline-flex px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-700">Bekor qilindi</span>
+            {% else %}
+            <span class="inline-flex px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600">{{ order.status }}</span>
+            {% endif %}
+        </div>
+        <div class="stat-card">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Sana</p>
+            <p class="text-sm font-semibold text-gray-800">
+                {{ order.created_at.strftime('%d.%m.%Y') if order.created_at else '—' }}
+            </p>
+            <p class="text-xs text-gray-400">
+                {{ order.created_at.strftime('%H:%M') if order.created_at else '' }}
+            </p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Order items -->
+        <div class="lg:col-span-2 space-y-4">
+            <div class="table-container">
+                <div class="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                    <h2 class="text-base font-semibold text-gray-800">Buyurtma tarkibi</h2>
+                </div>
+                {% if items %}
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-100">
+                            <th class="text-left px-4 py-3 font-medium text-gray-500">Mahsulot</th>
+                            <th class="text-right px-4 py-3 font-medium text-gray-500">Narx</th>
+                            <th class="text-center px-4 py-3 font-medium text-gray-500">Status</th>
+                            <th class="text-left px-4 py-3 font-medium text-gray-500">Akkaunt</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        {% for item in items %}
+                        <tr class="even:bg-gray-50/50">
+                            <td class="px-4 py-3">
+                                <div class="font-medium text-gray-800">{{ item.product_name or '—' }}</div>
+                                {% if item.product_duration %}
+                                <div class="text-xs text-gray-400">{{ item.product_duration }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-right font-medium text-gray-900">
+                                {{ "{:,}".format(item.price|int) }} so'm
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                                {% if item.status == 'pending' %}
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Kutilmoqda</span>
+                                {% elif item.status == 'delivered' %}
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Yetkazildi</span>
+                                {% elif item.status == 'refunded' %}
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Qaytarildi</span>
+                                {% else %}
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ item.status or '—' }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3">
+                                {% if order.status == 'delivered' and item.account_login %}
+                                <div class="font-mono text-xs text-gray-700">{{ item.account_login }}</div>
+                                <div class="font-mono text-xs text-gray-400">{{ item.account_password }}</div>
+                                {% else %}
+                                <span class="text-gray-400 text-xs">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="py-8 text-center text-gray-400">Mahsulotlar yo'q</div>
+                {% endif %}
+            </div>
+
+            <!-- Actions -->
+            {% if order.status in ['pending', 'confirmed'] %}
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-wrap gap-3">
+                {% if order.status == 'pending' %}
+                <form method="POST" action="/orders/{{ order.id }}/confirm">
+                    <button type="submit" class="btn-success">Tasdiqlash</button>
+                </form>
+                {% endif %}
+                {% if order.status in ['pending', 'confirmed'] %}
+                <form method="POST" action="/orders/{{ order.id }}/deliver">
+                    <button type="submit" class="btn-primary">Yetkazildi deb belgilash</button>
+                </form>
+                <form method="POST" action="/orders/{{ order.id }}/cancel"
+                      onsubmit="return confirm('Buyurtmani bekor qilishni tasdiqlaysizmi?')">
+                    <button type="submit" class="btn-danger">Bekor qilish</button>
+                </form>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Customer info -->
+        <div class="space-y-4">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <h2 class="text-base font-semibold text-gray-800 mb-4">Mijoz ma'lumotlari</h2>
+                {% if user %}
+                <div class="space-y-3">
+                    <div>
+                        <p class="text-xs text-gray-500">Ism</p>
+                        <p class="text-sm font-medium text-gray-800">{{ user.full_name or '—' }}</p>
+                    </div>
+                    {% if user.username %}
+                    <div>
+                        <p class="text-xs text-gray-500">Username</p>
+                        <p class="text-sm text-gray-700">@{{ user.username }}</p>
+                    </div>
+                    {% endif %}
+                    <div>
+                        <p class="text-xs text-gray-500">Telegram ID</p>
+                        <p class="text-sm font-mono text-gray-600">{{ user.telegram_id }}</p>
+                    </div>
+                    {% if user.phone %}
+                    <div>
+                        <p class="text-xs text-gray-500">Telefon</p>
+                        <p class="text-sm text-gray-700">{{ user.phone }}</p>
+                    </div>
+                    {% endif %}
+                    <div>
+                        <p class="text-xs text-gray-500">Ro'yxatdan o'tgan</p>
+                        <p class="text-sm text-gray-600">
+                            {{ user.created_at.strftime('%d.%m.%Y') if user.created_at else '—' }}
+                        </p>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-gray-400 text-sm">Foydalanuvchi ma'lumotlari yo'q</p>
+                {% endif %}
+            </div>
+
+            {% if order.payment_method or order.payment_proof %}
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <h2 class="text-base font-semibold text-gray-800 mb-3">To'lov</h2>
+                {% if order.payment_method %}
+                <div class="mb-2">
+                    <p class="text-xs text-gray-500">Usul</p>
+                    <p class="text-sm font-medium text-gray-800">{{ order.payment_method }}</p>
+                </div>
+                {% endif %}
+                {% if order.payment_proof %}
+                <div>
+                    <p class="text-xs text-gray-500 mb-1">Chek</p>
+                    <a href="{{ order.payment_proof }}" target="_blank"
+                       class="text-indigo-600 hover:text-indigo-800 text-sm underline">Ko'rish</a>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

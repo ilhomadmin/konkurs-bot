@@ -1,27 +1,23 @@
 """
 Buyurtma yaratish handleri — savat → band qilish → to'lov kutish
+YANGI STRUKTURA: duration_tier yo'q, narx products.price dan
 """
+import logging
 from aiogram import Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-from bot.config import PAYMENT_GROUP_ID
 from bot.db.models import (
     get_user, cart_get, cart_clear,
-    create_order, create_order_item,
-    get_prices_by_product, get_vip_level,
-    reserve_accounts_for_order, release_reserved_accounts,
-    update_order_status, set_order_progress_message,
-    get_order, increment_promo_usage, get_promo_by_code,
+    create_order, add_order_item,
+    reserve_accounts, release_reserved,
+    update_order_status, get_promo_by_code,
+    increment_promo_usage,
 )
 from bot.utils.texts import t
-from bot.utils.duration import tier_display_name
 
+logger = logging.getLogger(__name__)
 router = Router()
-
-# To'lov rekvizitlari (config ga qo'shilishi kerak, hozir hardcode)
-CLICK_NUMBER = "8600 0000 0000 0000"
-PAYME_NUMBER = "8600 0000 0000 0000"
 
 
 async def create_order_handler(
@@ -35,7 +31,6 @@ async def create_order_handler(
     Savat elementlarini tekshiradi, band qiladi, orders/order_items ga yozadi.
     """
     try:
-        # Savatni olish
         items = await cart_get(user_telegram_id)
         if not items:
             await message.answer(t("cart_empty", lang))
@@ -43,7 +38,7 @@ async def create_order_handler(
 
         await message.answer(t("order_creating", lang))
 
-        # Narxlar va chegirma hisoblash
+        # Narxlar hisoblash (price to'g'ridan-to'g'ri product dan keladi)
         total = sum(item["price"] * item["quantity"] for item in items)
 
         # FSM dan promo ni olish
@@ -53,10 +48,20 @@ async def create_order_handler(
         if promo_code:
             promo = await get_promo_by_code(promo_code)
 
+        # VIP chegirma
         user = await get_user(user_telegram_id)
-        vip_level = user.get("vip_level", "standard") if user else "standard"
-        vip_info = await get_vip_level(vip_level)
-        vip_pct = vip_info["discount_percent"] if vip_info else 0
+        vip_pct = 0
+        try:
+            from bot.db.models import get_vip_levels
+            vip_levels = await get_vip_levels()
+            vip_level = user.get("vip_level", "standard") if user else "standard"
+            for vl in vip_levels:
+                if vl["level"] == vip_level:
+                    vip_pct = vl["discount_percent"]
+                    break
+        except Exception:
+            pass
+
         promo_pct = promo["discount_percent"] if promo else 0
         final_pct = max(vip_pct, promo_pct)
         discount_amount = int(total * final_pct / 100)
@@ -66,7 +71,7 @@ async def create_order_handler(
 
         # Buyurtma yaratish
         order_id = await create_order(
-            user_telegram_id=user_telegram_id,
+            telegram_id=user_telegram_id,
             total_amount=final_amount,
             discount_amount=discount_amount,
             promo_code_id=promo_id
@@ -75,40 +80,36 @@ async def create_order_handler(
         # Har bir savat elementi uchun akkauntlarni band qilish
         shortage_details = []
         for item in items:
-            # Narxni topish
-            prices = await get_prices_by_product(item["product_id"])
-            price_info = next((p for p in prices if p["duration_tier"] == item["duration_tier"]), None)
-            cost_price = price_info["cost_price"] if price_info else 0
+            cost_price = item.get("cost_price", 0)
             unit_price = item["price"]
 
             # Akkauntlarni band qilish
-            reserved = await reserve_accounts_for_order(
-                order_id=order_id,
+            reserved = await reserve_accounts(
                 product_id=item["product_id"],
-                duration_tier=item["duration_tier"],
-                quantity=item["quantity"]
+                quantity=item["quantity"],
+                order_id=order_id
             )
 
             if len(reserved) < item["quantity"]:
                 shortage = item["quantity"] - len(reserved)
-                tier_name = tier_display_name(item["duration_tier"], lang)
-                name = item[f"name_{lang}"]
-                shortage_details.append(f"• {name} ({tier_name}): {shortage} ta yetmaydi" if lang == "uz"
-                                         else f"• {name} ({tier_name}): не хватает {shortage} шт")
+                name = item.get(f"name_{lang}", item.get("name_uz", "?"))
+                shortage_details.append(
+                    f"• {name}: {shortage} ta yetmaydi" if lang == "uz"
+                    else f"• {name}: не хватает {shortage} шт"
+                )
 
             # order_items ga yozish
-            await create_order_item(
+            await add_order_item(
                 order_id=order_id,
                 product_id=item["product_id"],
                 quantity=item["quantity"],
-                duration_tier=item["duration_tier"],
                 unit_price=unit_price,
                 cost_price=cost_price
             )
 
         # Yetarli akkaunt yo'q bo'lsa — buyurtmani bekor qilish
         if shortage_details:
-            await release_reserved_accounts(order_id)
+            await release_reserved(order_id)
             await update_order_status(order_id, "cancelled")
             details_text = "\n".join(shortage_details)
             await message.answer(t("order_insufficient_stock", lang, details=details_text))
@@ -121,18 +122,34 @@ async def create_order_handler(
         if promo_id:
             await increment_promo_usage(promo_id)
 
+        # To'lov ma'lumotlarini settings dan olish
+        try:
+            from bot.utils.settings import get_setting
+            import json
+            methods_json = await get_setting("payment_methods", "[]")
+            methods = json.loads(methods_json)
+            payment_info = ""
+            for m in methods:
+                if m.get("active"):
+                    payment_info += f"\n💳 {m['name']}: {m.get('card', '')}"
+            if not payment_info:
+                payment_info = "\n💳 To'lov ma'lumotlari sozlanmagan"
+        except Exception:
+            payment_info = ""
+
         # Progress bar xabarini yuborish
         progress_msg = await message.answer(
             t("order_created_progress", lang,
               order_id=order_id,
               amount=final_amount,
-              click=CLICK_NUMBER,
-              payme=PAYME_NUMBER)
+              payment_info=payment_info)
         )
 
         # progress_message_id ni saqlash
-        await set_order_progress_message(order_id, progress_msg.message_id)
+        await update_order_status(order_id, "pending_payment",
+                                  progress_message_id=progress_msg.message_id)
         await state.clear()
 
     except Exception as e:
+        logger.exception(f"create_order_handler error: {e}")
         await message.answer(t("error_general", lang))

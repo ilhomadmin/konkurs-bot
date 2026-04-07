@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% set active_page = "orders" %}
+
+{% block title %}Buyurtmalar — IDROK.AI Admin{% endblock %}
+
+{% block breadcrumbs %}
+<span class="text-sm text-gray-500">Buyurtmalar</span>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header -->
+    <div>
+        <h1 class="text-2xl font-semibold text-gray-900">Buyurtmalar</h1>
+        <p class="text-sm text-gray-500 mt-1">Barcha buyurtmalar ro'yxati</p>
+    </div>
+
+    <!-- Status filter tabs -->
+    <div class="flex items-center gap-1 bg-white rounded-xl shadow-sm border border-gray-100 p-1 overflow-x-auto">
+        {% set statuses = [
+            ('', 'Hammasi'),
+            ('pending', "To'lov kutilmoqda"),
+            ('confirmed', 'Tasdiqlangan'),
+            ('delivered', 'Yetkazildi'),
+            ('cancelled', 'Bekor'),
+        ] %}
+        {% for val, label in statuses %}
+        <a href="/orders{% if val %}?status={{ val }}{% endif %}"
+           class="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors
+                  {% if current_status == val or (not current_status and not val) %}
+                  bg-indigo-600 text-white
+                  {% else %}
+                  text-gray-600 hover:bg-gray-100
+                  {% endif %}">
+            {{ label }}
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Table -->
+    <div class="table-container">
+        {% if orders %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-gray-100 bg-gray-50">
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">#</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Mijoz</th>
+                        <th class="text-right px-4 py-3 font-medium text-gray-500">Summa</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Status</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Sana</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Amallar</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    {% for order in orders %}
+                    <tr class="hover:bg-indigo-50 transition-colors even:bg-gray-50/50 cursor-pointer"
+                        onclick="window.location='/orders/{{ order.id }}'">
+                        <td class="px-4 py-3 text-gray-400 font-mono text-xs">#{{ order.id }}</td>
+                        <td class="px-4 py-3">
+                            <div class="font-medium text-gray-800">{{ order.user_name or 'Foydalanuvchi' }}</div>
+                            {% if order.username %}
+                            <div class="text-xs text-gray-400">@{{ order.username }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-right font-semibold text-gray-900">
+                            {{ "{:,}".format(order.total_amount|int) }} so'm
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            {% if order.status == 'pending' %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Kutilmoqda</span>
+                            {% elif order.status == 'confirmed' %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Tasdiqlangan</span>
+                            {% elif order.status == 'delivered' %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Yetkazildi</span>
+                            {% elif order.status == 'cancelled' %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Bekor</span>
+                            {% else %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ order.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
+                            {{ order.created_at.strftime('%d.%m.%Y %H:%M') if order.created_at else '—' }}
+                        </td>
+                        <td class="px-4 py-3 text-center" onclick="event.stopPropagation()">
+                            <a href="/orders/{{ order.id }}" class="text-indigo-600 hover:text-indigo-800 text-xs font-medium">Ko'rish</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="flex flex-col items-center justify-center py-16 text-center">
+            <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
+            <p class="text-gray-500 font-medium">Buyurtmalar topilmadi</p>
+            <p class="text-gray-400 text-sm mt-1">Hozircha bu statusdagi buyurtmalar yo'q</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

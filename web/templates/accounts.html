@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% set active_page = "accounts" %}
+
+{% block title %}Akkauntlar — IDROK.AI Admin{% endblock %}
+
+{% block breadcrumbs %}
+<span class="text-sm text-gray-500">Akkauntlar</span>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="{ showAddSingle: false, showBulk: false }">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-semibold text-gray-900">Akkauntlar</h1>
+            <p class="text-sm text-gray-500 mt-1">Barcha login/parollar bazasi</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <button @click="showAddSingle = !showAddSingle; showBulk = false" class="btn-primary inline-flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Bitta qo'shish
+            </button>
+            <button @click="showBulk = !showBulk; showAddSingle = false" class="btn-secondary inline-flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                </svg>
+                Bulk yuklash
+            </button>
+        </div>
+    </div>
+
+    <!-- Inline: Add single account -->
+    <div x-show="showAddSingle" x-cloak
+         class="bg-white rounded-xl shadow-sm border border-indigo-100 p-6">
+        <h2 class="text-base font-semibold text-gray-800 mb-4">Bitta akkaunt qo'shish</h2>
+        <form method="POST" action="/accounts/add" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+                <label class="label" for="add_product_id">Obuna turi <span class="text-red-500">*</span></label>
+                <select id="add_product_id" name="product_id" required class="input-field">
+                    <option value="">Tanlang</option>
+                    {% for p in products %}
+                    <option value="{{ p.id }}">{{ p.name_uz }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="label" for="add_login">Login <span class="text-red-500">*</span></label>
+                <input id="add_login" name="login" type="text" required class="input-field" placeholder="email yoki login">
+            </div>
+            <div>
+                <label class="label" for="add_password">Parol <span class="text-red-500">*</span></label>
+                <input id="add_password" name="password" type="text" required class="input-field" placeholder="parol">
+            </div>
+            <div>
+                <label class="label" for="add_supplier">Supplier</label>
+                <input id="add_supplier" name="supplier" type="text" class="input-field" placeholder="manba">
+            </div>
+            <div class="sm:col-span-2 lg:col-span-4 flex justify-end gap-2">
+                <button type="button" @click="showAddSingle = false" class="btn-secondary">Bekor qilish</button>
+                <button type="submit" class="btn-primary">Qo'shish</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Inline: Bulk add -->
+    <div x-show="showBulk" x-cloak
+         class="bg-white rounded-xl shadow-sm border border-indigo-100 p-6">
+        <h2 class="text-base font-semibold text-gray-800 mb-1">Bulk yuklash</h2>
+        <p class="text-sm text-gray-500 mb-4">Har bir qatorda: <code class="bg-gray-100 px-1 rounded font-mono text-xs">login:parol</code> yoki <code class="bg-gray-100 px-1 rounded font-mono text-xs">login parol</code></p>
+        <form method="POST" action="/accounts/bulk" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                    <label class="label" for="bulk_product_id">Obuna turi <span class="text-red-500">*</span></label>
+                    <select id="bulk_product_id" name="product_id" required class="input-field">
+                        <option value="">Tanlang</option>
+                        {% for p in products %}
+                        <option value="{{ p.id }}">{{ p.name_uz }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="label" for="bulk_supplier">Supplier</label>
+                    <input id="bulk_supplier" name="supplier" type="text" class="input-field" placeholder="manba">
+                </div>
+            </div>
+            <div>
+                <label class="label" for="bulk_accounts">Akkauntlar (har qatorda bitta)</label>
+                <textarea id="bulk_accounts" name="accounts" rows="6" required
+                          class="input-field font-mono resize-y"
+                          placeholder="user@gmail.com:parol123&#10;user2@gmail.com:parol456"></textarea>
+            </div>
+            <div class="flex justify-end gap-2">
+                <button type="button" @click="showBulk = false" class="btn-secondary">Bekor qilish</button>
+                <button type="submit" class="btn-primary">Yuklash</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Filters -->
+    <form method="GET" action="/accounts" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <div class="flex flex-wrap items-end gap-3">
+            <div class="flex-1 min-w-40">
+                <label class="label" for="filter_product">Obuna turi</label>
+                <select id="filter_product" name="product_id" class="input-field">
+                    <option value="">Barchasi</option>
+                    {% for p in products %}
+                    <option value="{{ p.id }}" {% if current_product_id and current_product_id|string == p.id|string %}selected{% endif %}>
+                        {{ p.name_uz }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex-1 min-w-32">
+                <label class="label" for="filter_status">Status</label>
+                <select id="filter_status" name="status" class="input-field">
+                    <option value="">Barchasi</option>
+                    <option value="available" {% if current_status == 'available' %}selected{% endif %}>Bo'sh</option>
+                    <option value="reserved" {% if current_status == 'reserved' %}selected{% endif %}>Band</option>
+                    <option value="sold" {% if current_status == 'sold' %}selected{% endif %}>Sotilgan</option>
+                    <option value="expired" {% if current_status == 'expired' %}selected{% endif %}>Muddati o'tgan</option>
+                </select>
+            </div>
+            <button type="submit" class="btn-primary">Filtrlash</button>
+            <a href="/accounts" class="btn-secondary">Tozalash</a>
+        </div>
+    </form>
+
+    <!-- Table -->
+    <div class="table-container">
+        {% if accounts %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-gray-100 bg-gray-50">
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">#</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Obuna turi</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Login</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Parol</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Muddat</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Qolgan kun</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Status</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Supplier</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Sana</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Amallar</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    {% for acc in accounts %}
+                    <tr class="hover:bg-gray-50 transition-colors even:bg-gray-50/50">
+                        <td class="px-4 py-3 text-gray-400">{{ loop.index }}</td>
+                        <td class="px-4 py-3 font-medium text-gray-800">{{ acc.product_name or '—' }}</td>
+                        <td class="px-4 py-3 font-mono text-xs text-gray-700">{{ acc.login }}</td>
+                        <td class="px-4 py-3 font-mono text-xs text-gray-400">****</td>
+                        <td class="px-4 py-3 text-gray-500 text-xs">{{ acc.expires_at or '—' }}</td>
+                        <td class="px-4 py-3 text-center">
+                            {% if acc.days_left is defined and acc.days_left is not none %}
+                            <span class="{{ 'text-green-600' if acc.days_left > 7 else ('text-amber-600' if acc.days_left > 0 else 'text-red-500') }} font-medium">
+                                {{ acc.days_left }}
+                            </span>
+                            {% else %}
+                            <span class="text-gray-400">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            {% if acc.status == 'available' %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Bo'sh</span>
+                            {% elif acc.status == 'reserved' %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Band</span>
+                            {% elif acc.status == 'sold' %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Sotilgan</span>
+                            {% elif acc.status == 'expired' %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Muddati o'tgan</span>
+                            {% else %}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">{{ acc.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-gray-500 text-xs">{{ acc.supplier or '—' }}</td>
+                        <td class="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
+                            {{ acc.created_at.strftime('%d.%m.%Y') if acc.created_at else '—' }}
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <form method="POST" action="/accounts/{{ acc.id }}/delete" class="inline"
+                                  onsubmit="return confirm('Akkauntni o\'chirishni tasdiqlaysizmi?')">
+                                <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium">O'chirish</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="flex flex-col items-center justify-center py-16 text-center">
+            <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+            </svg>
+            <p class="text-gray-500 font-medium">Akkauntlar topilmadi</p>
+            <p class="text-gray-400 text-sm mt-1">Filter shartlarini o'zgartiring yoki yangi akkaunt qo'shing</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

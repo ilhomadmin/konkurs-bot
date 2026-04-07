@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% set active_page = "settings" %}
+
+{% block title %}Sozlamalar — IDROK.AI Admin{% endblock %}
+
+{% block breadcrumbs %}
+<span class="text-sm text-gray-500">Sozlamalar</span>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="{ openCategory: null }">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-semibold text-gray-900">Sozlamalar</h1>
+            <p class="text-sm text-gray-500 mt-1">Tizim sozlamalarini boshqarish</p>
+        </div>
+        <form method="POST" action="/settings/clear-cache">
+            <button type="submit" class="btn-secondary inline-flex items-center gap-2"
+                    onclick="return confirm('Keshni tozalashni tasdiqlaysizmi?')">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Keshni tozalash
+            </button>
+        </form>
+    </div>
+
+    {% set category_labels = {
+        'payment': "To'lov",
+        'marketing': 'Marketing',
+        'timing': 'Vaqt sozlamalari',
+        'inventory': 'Ombor',
+        'content': 'Kontent',
+        'menu': 'Menyu',
+        'general': 'Umumiy'
+    } %}
+
+    {% set category_icons = {
+        'payment': 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1',
+        'marketing': 'M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z',
+        'timing': 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+        'inventory': 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
+        'content': 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+        'menu': 'M4 6h16M4 12h16M4 18h16',
+        'general': 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z'
+    } %}
+
+    <!-- Settings grouped by category -->
+    {% for cat in categories %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <button @click="openCategory = openCategory === '{{ cat }}' ? null : '{{ cat }}'"
+                class="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors">
+            <div class="flex items-center gap-3">
+                <span class="w-9 h-9 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ category_icons.get(cat, category_icons.general) }}"/>
+                    </svg>
+                </span>
+                <div class="text-left">
+                    <h3 class="text-sm font-semibold text-gray-900">{{ category_labels.get(cat, cat|capitalize) }}</h3>
+                    <p class="text-xs text-gray-400">{{ settings|selectattr('category', 'equalto', cat)|list|length }} ta sozlama</p>
+                </div>
+            </div>
+            <svg class="w-5 h-5 text-gray-400 transition-transform" :class="openCategory === '{{ cat }}' && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </button>
+
+        <div x-show="openCategory === '{{ cat }}'" x-cloak class="border-t border-gray-100">
+            <div class="divide-y divide-gray-50">
+                {% for s in settings if s.category == cat %}
+                <form method="POST" action="/settings/{{ s.key }}" class="px-6 py-4" x-data="{ editing: false }">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="font-mono text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{{ s.key }}</span>
+                            </div>
+                            <p class="text-sm text-gray-500">{{ s.description or '—' }}</p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <div x-show="!editing">
+                                {% if s.value_type == 'boolean' %}
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium {% if s.value == 'true' or s.value == '1' %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-600{% endif %}">
+                                    {{ 'Ha' if (s.value == 'true' or s.value == '1') else "Yo'q" }}
+                                </span>
+                                {% else %}
+                                <span class="text-sm text-gray-800 font-medium max-w-xs truncate block">{{ s.value or '—' }}</span>
+                                {% endif %}
+                            </div>
+                            <button type="button" x-show="!editing" @click="editing = true" class="text-indigo-600 hover:text-indigo-800 text-xs font-medium">Tahrir</button>
+                        </div>
+                    </div>
+                    <div x-show="editing" x-cloak class="mt-3">
+                        {% if s.value_type == 'boolean' %}
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="hidden" name="value" value="false">
+                            <input type="checkbox" name="value" value="true" class="sr-only peer" {% if s.value == 'true' or s.value == '1' %}checked{% endif %}>
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                        </label>
+                        {% elif s.value_type == 'number' %}
+                        <input name="value" type="number" value="{{ s.value }}" class="input-field w-48">
+                        {% elif s.value_type == 'textarea' %}
+                        <textarea name="value" rows="3" class="input-field">{{ s.value }}</textarea>
+                        {% elif s.value_type == 'json' %}
+                        <textarea name="value" rows="4" class="input-field font-mono text-xs">{{ s.value }}</textarea>
+                        {% else %}
+                        <input name="value" type="text" value="{{ s.value }}" class="input-field w-full max-w-md">
+                        {% endif %}
+                        <div class="flex items-center gap-2 mt-2">
+                            <button type="submit" class="btn-primary text-xs px-3 py-1.5">Saqlash</button>
+                            <button type="button" @click="editing = false" class="btn-secondary text-xs px-3 py-1.5">Bekor</button>
+                        </div>
+                    </div>
+                </form>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if not categories %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center py-16 text-center">
+        <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+        </svg>
+        <p class="text-gray-500 font-medium">Sozlamalar yo'q</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

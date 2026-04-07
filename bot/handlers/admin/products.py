@@ -1,28 +1,27 @@
 """
-Admin: Kategoriya va mahsulot boshqarish handlerlar
-FSMContext bilan step-by-step jarayon
+Admin: Kategoriya va obuna turi (mahsulot) boshqarish handlerlar
+YANGI STRUKTURA: Narx to'g'ridan-to'g'ri product da, tier yo'q
 """
-from datetime import date
+import logging
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
 from bot.db.models import (
     create_category, get_all_categories, get_category_by_id,
     update_category, delete_category,
     create_product, get_products_by_category, get_product_by_id,
-    update_product, delete_product,
-    create_product_price, get_prices_by_product,
+    update_product, delete_product, get_product_stock,
 )
 from bot.keyboards.admin_kb import (
     categories_list_kb, category_actions_kb, confirm_delete_kb,
-    products_list_kb, product_actions_kb, prices_list_kb, tier_select_kb,
+    products_list_kb, product_actions_kb,
 )
 from bot.keyboards.common import back_kb
 from bot.utils.texts import t
-from bot.utils.duration import TIER_DISPLAY, TIER_MIN_MAX
 
+logger = logging.getLogger(__name__)
 router = Router()
 
 
@@ -39,6 +38,10 @@ class AddCategoryFSM(StatesGroup):
 class AddProductFSM(StatesGroup):
     name_uz = State()
     name_ru = State()
+    duration_text_uz = State()
+    duration_text_ru = State()
+    price = State()
+    cost_price = State()
     desc_uz = State()
     desc_ru = State()
     warranty = State()
@@ -46,16 +49,9 @@ class AddProductFSM(StatesGroup):
     video = State()
 
 
-class AddPriceFSM(StatesGroup):
-    tier = State()
-    price = State()
-    cost_price = State()
-
-
 # ==================== HELPER ====================
 
 async def get_lang_and_role(user_id: int) -> tuple[str, str | None]:
-    """Foydalanuvchi tili va rolini qaytaradi"""
     from bot.db.models import get_user
     from bot.handlers.admin.menu import get_admin_role
     user = await get_user(user_id)
@@ -67,8 +63,7 @@ async def get_lang_and_role(user_id: int) -> tuple[str, str | None]:
 # ==================== KATEGORIYALAR ====================
 
 @router.callback_query(F.data == "adm:cat:list")
-async def categories_list(callback: CallbackQuery) -> None:
-    """Kategoriyalar ro'yxatini ko'rsatish"""
+async def categories_list_handler(callback: CallbackQuery) -> None:
     try:
         lang, role = await get_lang_and_role(callback.from_user.id)
         if not role or role not in ("manager", "boss"):
@@ -76,34 +71,27 @@ async def categories_list(callback: CallbackQuery) -> None:
             return
 
         categories = await get_all_categories()
-        if categories:
-            text = t("categories_list", lang)
-        else:
-            text = t("no_categories", lang)
-
-        await callback.message.edit_text(
-            text,
-            reply_markup=categories_list_kb(categories, lang)
-        )
+        text = t("categories_list", lang) if categories else t("no_categories", lang)
+        await callback.message.edit_text(text, reply_markup=categories_list_kb(categories, lang))
         await callback.answer()
-    except Exception:
+    except Exception as e:
+        logger.exception(f"categories_list error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
 @router.callback_query(F.data == "adm:cat:add")
 async def add_category_start(callback: CallbackQuery, state: FSMContext) -> None:
-    """Kategoriya qo'shish jarayonini boshlash"""
     try:
         lang, role = await get_lang_and_role(callback.from_user.id)
         if not role or role not in ("manager", "boss"):
             await callback.answer(t("access_denied", lang), show_alert=True)
             return
-
         await state.update_data(lang=lang)
         await state.set_state(AddCategoryFSM.name_uz)
         await callback.message.edit_text(t("ask_category_name_uz", lang))
         await callback.answer()
-    except Exception:
+    except Exception as e:
+        logger.exception(f"add_category_start error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
@@ -147,24 +135,20 @@ async def category_desc_ru(message: Message, state: FSMContext) -> None:
 
 @router.message(AddCategoryFSM.video)
 async def category_video(message: Message, state: FSMContext) -> None:
-    """Video yoki /skip — kategoriyani DB ga saqlash"""
     data = await state.get_data()
     lang = data.get("lang", "uz")
-
     video_file_id = None
     if message.video:
         video_file_id = message.video.file_id
     elif message.text and message.text.strip() != "/skip":
-        # Matn video ID sifatida qabul qilinadi (test uchun)
         video_file_id = message.text.strip()
 
     try:
-        cat_id = await create_category(
+        await create_category(
             name_uz=data["name_uz"],
             name_ru=data["name_ru"],
             description_uz=data.get("desc_uz"),
             description_ru=data.get("desc_ru"),
-            instruction_video_file_id=video_file_id
         )
         await state.clear()
         await message.answer(
@@ -172,41 +156,36 @@ async def category_video(message: Message, state: FSMContext) -> None:
             reply_markup=back_kb("adm:cat:list", lang)
         )
     except Exception as e:
+        logger.exception(f"category_video error: {e}")
         await state.clear()
         await message.answer(f"{t('error_general', lang)}\n{e}")
 
 
 @router.callback_query(F.data.startswith("adm:cat:") & ~F.data.in_({"adm:cat:list", "adm:cat:add"}))
 async def category_detail(callback: CallbackQuery) -> None:
-    """Kategoriya tafsilotlari"""
     try:
         parts = callback.data.split(":")
         lang, role = await get_lang_and_role(callback.from_user.id)
-
         if not role or role not in ("manager", "boss"):
             await callback.answer(t("access_denied", lang), show_alert=True)
             return
 
-        # adm:cat:toggle:ID yoki adm:cat:del:ID yoki adm:cat:ID
         if parts[2] == "toggle" and len(parts) >= 4:
             cat_id = int(parts[3])
             cat = await get_category_by_id(cat_id)
             if cat:
-                new_active = 0 if cat["is_active"] else 1
-                await update_category(cat_id, is_active=new_active)
+                await update_category(cat_id, is_active=0 if cat["is_active"] else 1)
                 cat = await get_category_by_id(cat_id)
             await callback.message.edit_text(
-                f"{cat['name_' + lang]}\n{'✅ Faol' if cat['is_active'] else '🔴 Nofaol'}",
+                f"{cat['name_uz']}\n{'✅ Faol' if cat['is_active'] else '🔴 Nofaol'}",
                 reply_markup=category_actions_kb(cat_id, lang)
             )
-
         elif parts[2] == "del" and len(parts) >= 4:
             cat_id = int(parts[3])
             await callback.message.edit_text(
                 t("confirm_delete", lang),
                 reply_markup=confirm_delete_kb(f"adm:cat:delok:{cat_id}", lang)
             )
-
         elif parts[2] == "delok" and len(parts) >= 4:
             cat_id = int(parts[3])
             await delete_category(cat_id)
@@ -214,9 +193,7 @@ async def category_detail(callback: CallbackQuery) -> None:
                 t("category_deleted", lang),
                 reply_markup=back_kb("adm:cat:list", lang)
             )
-
         else:
-            # adm:cat:ID — kategoriya tafsiloti
             cat_id = int(parts[2])
             cat = await get_category_by_id(cat_id)
             if not cat:
@@ -224,26 +201,23 @@ async def category_detail(callback: CallbackQuery) -> None:
                 return
             status = "✅ Faol" if cat["is_active"] else "🔴 Nofaol"
             text = (
-                f"🗂 <b>{cat['name_' + lang]}</b>\n"
-                f"{cat.get('description_' + lang) or ''}\n"
+                f"🗂 <b>{cat['name_uz']}</b> / {cat['name_ru']}\n"
+                f"{cat.get('description_uz') or ''}\n"
                 f"Holat: {status}"
             )
             await callback.message.edit_text(
-                text,
-                reply_markup=category_actions_kb(cat_id, lang),
-                parse_mode="HTML"
+                text, reply_markup=category_actions_kb(cat_id, lang), parse_mode="HTML"
             )
-
         await callback.answer()
     except Exception as e:
+        logger.exception(f"category_detail error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
-# ==================== MAHSULOTLAR ====================
+# ==================== OBUNA TURLARI (MAHSULOTLAR) ====================
 
 @router.callback_query(F.data.startswith("adm:prod:list:"))
-async def products_list(callback: CallbackQuery) -> None:
-    """Kategoriya mahsulotlari ro'yxati"""
+async def products_list_handler(callback: CallbackQuery) -> None:
     try:
         lang, role = await get_lang_and_role(callback.from_user.id)
         if not role or role not in ("manager", "boss"):
@@ -254,24 +228,21 @@ async def products_list(callback: CallbackQuery) -> None:
         cat = await get_category_by_id(cat_id)
         products = await get_products_by_category(cat_id)
 
-        if products:
-            text = f"📦 <b>{cat['name_' + lang] if cat else ''}</b>\n{t('products_list', lang)}"
-        else:
-            text = f"📦 <b>{cat['name_' + lang] if cat else ''}</b>\n{t('no_products', lang)}"
+        cat_name = cat[f'name_{lang}'] if cat else ''
+        text = f"📦 <b>{cat_name}</b>\n"
+        text += t('products_list', lang) if products else t('no_products', lang)
 
         await callback.message.edit_text(
-            text,
-            reply_markup=products_list_kb(products, cat_id, lang),
-            parse_mode="HTML"
+            text, reply_markup=products_list_kb(products, cat_id, lang), parse_mode="HTML"
         )
         await callback.answer()
-    except Exception:
+    except Exception as e:
+        logger.exception(f"products_list error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("adm:prod:add:"))
 async def add_product_start(callback: CallbackQuery, state: FSMContext) -> None:
-    """Mahsulot qo'shish jarayonini boshlash"""
     try:
         lang, role = await get_lang_and_role(callback.from_user.id)
         if not role or role not in ("manager", "boss"):
@@ -283,7 +254,8 @@ async def add_product_start(callback: CallbackQuery, state: FSMContext) -> None:
         await state.set_state(AddProductFSM.name_uz)
         await callback.message.edit_text(t("ask_product_name_uz", lang))
         await callback.answer()
-    except Exception:
+    except Exception as e:
+        logger.exception(f"add_product_start error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
@@ -301,6 +273,54 @@ async def product_name_ru(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
     lang = data.get("lang", "uz")
     await state.update_data(name_ru=message.text.strip())
+    await state.set_state(AddProductFSM.duration_text_uz)
+    await message.answer(t("ask_duration_text_uz", lang))
+
+
+@router.message(AddProductFSM.duration_text_uz)
+async def product_duration_uz(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    lang = data.get("lang", "uz")
+    text = None if message.text.strip() == "/skip" else message.text.strip()
+    await state.update_data(duration_text_uz=text)
+    await state.set_state(AddProductFSM.duration_text_ru)
+    await message.answer(t("ask_duration_text_ru", lang))
+
+
+@router.message(AddProductFSM.duration_text_ru)
+async def product_duration_ru(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    lang = data.get("lang", "uz")
+    text = None if message.text.strip() == "/skip" else message.text.strip()
+    await state.update_data(duration_text_ru=text)
+    await state.set_state(AddProductFSM.price)
+    await message.answer(t("ask_price", lang))
+
+
+@router.message(AddProductFSM.price)
+async def product_price(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    lang = data.get("lang", "uz")
+    try:
+        price = int(message.text.strip().replace(" ", "").replace(",", ""))
+    except ValueError:
+        await message.answer(t("invalid_number", lang))
+        return
+    await state.update_data(price=price)
+    await state.set_state(AddProductFSM.cost_price)
+    await message.answer(t("ask_cost_price", lang))
+
+
+@router.message(AddProductFSM.cost_price)
+async def product_cost_price(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    lang = data.get("lang", "uz")
+    try:
+        cost_price = int(message.text.strip().replace(" ", "").replace(",", ""))
+    except ValueError:
+        await message.answer(t("invalid_number", lang))
+        return
+    await state.update_data(cost_price=cost_price)
     await state.set_state(AddProductFSM.desc_uz)
     await message.answer(t("ask_product_desc_uz", lang))
 
@@ -323,7 +343,6 @@ async def product_desc_ru(message: Message, state: FSMContext) -> None:
     await state.update_data(desc_ru=desc)
     await state.set_state(AddProductFSM.warranty)
 
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text=t("btn_warranty_yes", lang), callback_data="prod:warranty:yes"),
@@ -366,7 +385,6 @@ async def product_warranty_days(message: Message, state: FSMContext) -> None:
 
 @router.message(AddProductFSM.video)
 async def product_video(message: Message, state: FSMContext) -> None:
-    """Video yoki /skip — mahsulotni DB ga saqlash"""
     data = await state.get_data()
     lang = data.get("lang", "uz")
 
@@ -378,32 +396,37 @@ async def product_video(message: Message, state: FSMContext) -> None:
 
     try:
         prod_id = await create_product(
-            category_id=data["category_id"],
             name_uz=data["name_uz"],
             name_ru=data["name_ru"],
+            price=data["price"],
+            cost_price=data.get("cost_price", 0),
+            category_id=data.get("category_id"),
             description_uz=data.get("desc_uz"),
             description_ru=data.get("desc_ru"),
-            instruction_video_file_id=video_file_id,
+            duration_text_uz=data.get("duration_text_uz"),
+            duration_text_ru=data.get("duration_text_ru"),
             has_warranty=data.get("has_warranty", False),
-            warranty_days=data.get("warranty_days", 0)
+            warranty_days=data.get("warranty_days", 0),
         )
         await state.clear()
+
+        stock = await get_product_stock(prod_id)
+        text = t("product_created", lang) + f"\n💰 {data['price']:,} so'm | 📦 Stok: {stock}"
         await message.answer(
-            t("product_created", lang),
-            reply_markup=prices_list_kb([], prod_id, lang)
+            text,
+            reply_markup=back_kb(f"adm:prod:list:{data.get('category_id', 0)}", lang)
         )
     except Exception as e:
+        logger.exception(f"product_video error: {e}")
         await state.clear()
         await message.answer(f"{t('error_general', lang)}\n{e}")
 
 
 @router.callback_query(F.data.startswith("adm:prod:"))
 async def product_detail(callback: CallbackQuery) -> None:
-    """Mahsulot tafsilotlari va amallari"""
     try:
         parts = callback.data.split(":")
         lang, role = await get_lang_and_role(callback.from_user.id)
-
         if not role or role not in ("manager", "boss"):
             await callback.answer(t("access_denied", lang), show_alert=True)
             return
@@ -417,7 +440,7 @@ async def product_detail(callback: CallbackQuery) -> None:
                 await update_product(prod_id, is_active=0 if prod["is_active"] else 1)
                 prod = await get_product_by_id(prod_id)
             await callback.message.edit_text(
-                f"{prod['name_' + lang]}\n{'✅ Faol' if prod['is_active'] else '🔴 Nofaol'}",
+                f"{prod['name_uz']}\n{'✅ Faol' if prod['is_active'] else '🔴 Nofaol'}",
                 reply_markup=product_actions_kb(prod_id, lang)
             )
 
@@ -437,19 +460,17 @@ async def product_detail(callback: CallbackQuery) -> None:
             )
 
         elif action == "back" and len(parts) >= 4:
-            # Kategoriyaga qaytish
             prod_id = int(parts[3])
             prod = await get_product_by_id(prod_id)
             if prod:
-                cat_id = prod["category_id"]
-                products = await get_products_by_category(cat_id)
+                cat_id = prod.get("category_id", 0)
+                products = await get_products_by_category(cat_id) if cat_id else []
                 await callback.message.edit_text(
                     t("products_list", lang),
                     reply_markup=products_list_kb(products, cat_id, lang)
                 )
 
         else:
-            # adm:prod:ID — mahsulot tafsiloti
             try:
                 prod_id = int(action)
             except ValueError:
@@ -461,140 +482,29 @@ async def product_detail(callback: CallbackQuery) -> None:
                 await callback.answer(t("not_found", lang), show_alert=True)
                 return
 
+            stock = await get_product_stock(prod_id)
             warranty = ""
             if prod["has_warranty"]:
-                warranty = f"\n🛡 Kafolat: {prod['warranty_days']} kun" if lang == "uz" else f"\n🛡 Гарантия: {prod['warranty_days']} дней"
+                warranty = f"\n🛡 Kafolat: {prod['warranty_days']} kun"
+
+            duration = ""
+            if prod.get("duration_text_uz"):
+                duration = f"\n⏱ {prod['duration_text_uz']}"
 
             status = "✅ Faol" if prod["is_active"] else "🔴 Nofaol"
             text = (
-                f"📦 <b>{prod['name_' + lang]}</b>\n"
-                f"{prod.get('description_' + lang) or ''}"
-                f"{warranty}\n"
+                f"📦 <b>{prod['name_uz']}</b> / {prod['name_ru']}\n"
+                f"{prod.get('description_uz') or ''}"
+                f"{duration}{warranty}\n"
+                f"💰 Narx: {prod['price']:,} so'm | Tannarx: {prod.get('cost_price', 0):,}\n"
+                f"📦 Stok: {stock}\n"
                 f"Holat: {status}"
             )
             await callback.message.edit_text(
-                text,
-                reply_markup=product_actions_kb(prod_id, lang),
-                parse_mode="HTML"
+                text, reply_markup=product_actions_kb(prod_id, lang), parse_mode="HTML"
             )
 
         await callback.answer()
     except Exception as e:
+        logger.exception(f"product_detail error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
-
-
-# ==================== NARX TIERLARI ====================
-
-@router.callback_query(F.data.startswith("adm:price:list:"))
-async def prices_list(callback: CallbackQuery) -> None:
-    """Narx tierlari ro'yxati"""
-    try:
-        lang, role = await get_lang_and_role(callback.from_user.id)
-        if not role or role not in ("manager", "boss"):
-            await callback.answer(t("access_denied", lang), show_alert=True)
-            return
-
-        prod_id = int(callback.data.split(":")[3])
-        prices = await get_prices_by_product(prod_id)
-        prod = await get_product_by_id(prod_id)
-
-        text = f"💰 <b>{prod['name_' + lang] if prod else ''}</b>\n{t('prices_menu', lang)}"
-        if not prices:
-            text += f"\n{t('no_prices', lang)}"
-
-        await callback.message.edit_text(
-            text,
-            reply_markup=prices_list_kb(prices, prod_id, lang),
-            parse_mode="HTML"
-        )
-        await callback.answer()
-    except Exception:
-        await callback.answer(t("error_general"), show_alert=True)
-
-
-@router.callback_query(F.data.startswith("adm:price:add:"))
-async def add_price_start(callback: CallbackQuery, state: FSMContext) -> None:
-    """Narx tier qo'shish jarayonini boshlash"""
-    try:
-        lang, role = await get_lang_and_role(callback.from_user.id)
-        if not role or role not in ("manager", "boss"):
-            await callback.answer(t("access_denied", lang), show_alert=True)
-            return
-
-        prod_id = int(callback.data.split(":")[3])
-        await state.update_data(lang=lang, product_id=prod_id)
-        await state.set_state(AddPriceFSM.tier)
-        await callback.message.edit_text(
-            t("ask_tier_select", lang),
-            reply_markup=tier_select_kb(lang, prod_id)
-        )
-        await callback.answer()
-    except Exception:
-        await callback.answer(t("error_general"), show_alert=True)
-
-
-@router.callback_query(F.data.startswith("adm:tier:"), AddPriceFSM.tier)
-async def price_tier_selected(callback: CallbackQuery, state: FSMContext) -> None:
-    """Tier tanlanganda"""
-    data = await state.get_data()
-    lang = data.get("lang", "uz")
-    # adm:tier:TIER:PROD_ID
-    parts = callback.data.split(":")
-    tier = parts[2]
-    await state.update_data(selected_tier=tier)
-    await state.set_state(AddPriceFSM.price)
-    await callback.message.edit_text(t("ask_price", lang))
-    await callback.answer()
-
-
-@router.message(AddPriceFSM.price)
-async def price_amount(message: Message, state: FSMContext) -> None:
-    data = await state.get_data()
-    lang = data.get("lang", "uz")
-    try:
-        price = int(message.text.strip().replace(" ", "").replace(",", ""))
-    except ValueError:
-        await message.answer(t("invalid_number", lang))
-        return
-    await state.update_data(price=price)
-    await state.set_state(AddPriceFSM.cost_price)
-    await message.answer(t("ask_cost_price", lang))
-
-
-@router.message(AddPriceFSM.cost_price)
-async def price_cost(message: Message, state: FSMContext) -> None:
-    """Tannarx kiritilgandan keyin — DB ga saqlash"""
-    data = await state.get_data()
-    lang = data.get("lang", "uz")
-    try:
-        cost_price = int(message.text.strip().replace(" ", "").replace(",", ""))
-    except ValueError:
-        await message.answer(t("invalid_number", lang))
-        return
-
-    tier = data["selected_tier"]
-    prod_id = data["product_id"]
-    min_days, max_days = TIER_MIN_MAX[tier]
-    display_uz = TIER_DISPLAY[tier]["uz"]
-    display_ru = TIER_DISPLAY[tier]["ru"]
-
-    try:
-        await create_product_price(
-            product_id=prod_id,
-            duration_tier=tier,
-            display_name_uz=display_uz,
-            display_name_ru=display_ru,
-            min_days=min_days,
-            max_days=max_days,
-            price=data["price"],
-            cost_price=cost_price
-        )
-        await state.clear()
-        prices = await get_prices_by_product(prod_id)
-        await message.answer(
-            t("price_created", lang),
-            reply_markup=prices_list_kb(prices, prod_id, lang)
-        )
-    except Exception as e:
-        await state.clear()
-        await message.answer(f"{t('error_general', lang)}\n{e}")

@@ -1,15 +1,17 @@
 """
 Mening buyurtmalarim — tarixi, pagination, tafsilot
+YANGI STRUKTURA: duration_tier yo'q
 """
+import logging
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
 from bot.db.models import (
-    get_user, get_user_orders, get_order, get_order_items, count_user_orders
+    get_user, get_user_orders, get_order_by_id, get_order_items,
 )
 from bot.utils.texts import t
-from bot.utils.duration import tier_display_name
 
+logger = logging.getLogger(__name__)
 router = Router()
 
 PAGE_SIZE = 5
@@ -25,7 +27,6 @@ STATUS_KEYS = {
 
 
 def orders_list_kb(orders: list[dict], lang: str, page: int, total: int) -> InlineKeyboardMarkup:
-    """Buyurtmalar ro'yxati klaviaturasi"""
     buttons = []
     total_pages = (total + PAGE_SIZE - 1) // PAGE_SIZE or 1
 
@@ -38,7 +39,6 @@ def orders_list_kb(orders: list[dict], lang: str, page: int, total: int) -> Inli
             callback_data=f"ord:{order['id']}:{page}"
         )])
 
-    # Pagination
     nav_row = []
     if page > 0:
         nav_row.append(InlineKeyboardButton(
@@ -61,14 +61,9 @@ def orders_list_kb(orders: list[dict], lang: str, page: int, total: int) -> Inli
 
 
 def order_detail_kb(order_id: int, items: list[dict], lang: str, back_page: int) -> InlineKeyboardMarkup:
-    """Buyurtma tafsiloti klaviaturasi"""
     buttons = []
 
-    # Video instruksiya (birinchi mahsulotdan)
-    has_video = any(
-        i.get("product_video") or i.get("category_video")
-        for i in items
-    )
+    has_video = any(i.get("instruction_video_file_id") for i in items)
     if has_video:
         buttons.append([InlineKeyboardButton(
             text=t("btn_instruction_video", lang),
@@ -84,51 +79,50 @@ def order_detail_kb(order_id: int, items: list[dict], lang: str, back_page: int)
 
 @router.message(F.text.in_(["📋 Buyurtmalarim", "📋 Мои заказы"]))
 async def my_orders(message: Message) -> None:
-    """Buyurtmalar ro'yxati"""
     try:
         user = await get_user(message.from_user.id)
         lang = user.get("language", "uz") if user else "uz"
 
-        total = await count_user_orders(message.from_user.id)
+        orders = await get_user_orders(message.from_user.id, limit=100)
+        total = len(orders)
         if total == 0:
             await message.answer(t("no_orders", lang))
             return
 
-        orders = await get_user_orders(message.from_user.id, limit=PAGE_SIZE, offset=0)
+        page_orders = orders[:PAGE_SIZE]
         await message.answer(
             t("my_orders_title", lang),
-            reply_markup=orders_list_kb(orders, lang, 0, total)
+            reply_markup=orders_list_kb(page_orders, lang, 0, total)
         )
-    except Exception:
+    except Exception as e:
+        logger.exception(f"my_orders error: {e}")
         await message.answer(t("error_general"))
 
 
 @router.callback_query(F.data.startswith("ordpage:"))
 async def orders_page(callback: CallbackQuery) -> None:
-    """Buyurtmalar sahifasi"""
     try:
         page = int(callback.data.split(":")[1])
         user = await get_user(callback.from_user.id)
         lang = user.get("language", "uz") if user else "uz"
 
-        total = await count_user_orders(callback.from_user.id)
-        orders = await get_user_orders(
-            callback.from_user.id,
-            limit=PAGE_SIZE,
-            offset=page * PAGE_SIZE
-        )
+        orders = await get_user_orders(callback.from_user.id, limit=100)
+        total = len(orders)
+        start = page * PAGE_SIZE
+        page_orders = orders[start:start + PAGE_SIZE]
+
         await callback.message.edit_text(
             t("my_orders_title", lang),
-            reply_markup=orders_list_kb(orders, lang, page, total)
+            reply_markup=orders_list_kb(page_orders, lang, page, total)
         )
         await callback.answer()
-    except Exception:
+    except Exception as e:
+        logger.exception(f"orders_page error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("ord:"))
 async def order_detail(callback: CallbackQuery) -> None:
-    """Buyurtma tafsiloti"""
     try:
         parts = callback.data.split(":")
         order_id = int(parts[1])
@@ -137,38 +131,35 @@ async def order_detail(callback: CallbackQuery) -> None:
         user = await get_user(callback.from_user.id)
         lang = user.get("language", "uz") if user else "uz"
 
-        order = await get_order(order_id)
+        order = await get_order_by_id(order_id)
         if not order:
             await callback.answer(t("not_found", lang), show_alert=True)
             return
 
         # Foydalanuvchi o'z buyurtmasimi tekshirish
-        if order.get("user_telegram_id") != callback.from_user.id:
+        if order.get("telegram_id") != callback.from_user.id:
             await callback.answer(t("access_denied", lang), show_alert=True)
             return
 
         items = await get_order_items(order_id)
 
-        # Status
         status_key = STATUS_KEYS.get(order["status"], "order_status_pending")
         status_text = t(status_key, lang)
 
-        # Element satrlari
         item_lines = []
         for item in items:
-            name = item[f"name_{lang}"]
-            tier_name = tier_display_name(item["duration_tier"], lang)
+            name = item.get(f"name_{lang}", item.get("name_uz", "?"))
 
             if item.get("status") == "delivered" and item.get("login"):
                 item_lines.append(t("order_item_detail", lang,
-                                    name=name, tier=tier_name,
+                                    name=name,
                                     qty=item["quantity"],
                                     login=item.get("login", "—"),
                                     password=item.get("password", "—"),
-                                    expiry=item.get("account_expiry") or "—"))
+                                    expiry=item.get("expiry_date") or "—"))
             else:
                 item_lines.append(t("order_item_pending", lang,
-                                    name=name, tier=tier_name,
+                                    name=name,
                                     qty=item["quantity"]))
 
         items_text = "\n".join(item_lines)
@@ -187,13 +178,13 @@ async def order_detail(callback: CallbackQuery) -> None:
             parse_mode="HTML"
         )
         await callback.answer()
-    except Exception:
+    except Exception as e:
+        logger.exception(f"order_detail error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("ordvid:"))
 async def order_instruction_video(callback: CallbackQuery) -> None:
-    """Instruksiya videosi yuborish"""
     try:
         order_id = int(callback.data.split(":")[1])
         user = await get_user(callback.from_user.id)
@@ -201,7 +192,7 @@ async def order_instruction_video(callback: CallbackQuery) -> None:
 
         items = await get_order_items(order_id)
         for item in items:
-            video_id = item.get("product_video") or item.get("category_video")
+            video_id = item.get("instruction_video_file_id")
             if video_id:
                 await callback.message.answer_video(
                     video=video_id,
@@ -210,5 +201,6 @@ async def order_instruction_video(callback: CallbackQuery) -> None:
                 break
 
         await callback.answer()
-    except Exception:
+    except Exception as e:
+        logger.exception(f"order_instruction_video error: {e}")
         await callback.answer(t("error_general"), show_alert=True)
