@@ -85,8 +85,9 @@ async def accounts_add(
     product_id: int = Form(...),
     login: str = Form(...),
     password: str = Form(...),
-    expiry_date: str = Form(...),
+    expiry_date: str = Form(""),
     supplier: str = Form(""),
+    next: str = Form(""),
 ):
     redirect = require_auth(request)
     if redirect:
@@ -97,35 +98,40 @@ async def accounts_add(
             product_id=product_id,
             login=login.strip(),
             password=password.strip(),
-            expiry_date=expiry_date,
+            expiry_date=expiry_date.strip() or None,
             supplier=supplier.strip() or None,
         )
-        return RedirectResponse("/accounts?success=1", status_code=302)
+        dest = next.strip() or "/accounts"
+        sep = "&" if "?" in dest else "?"
+        return RedirectResponse(f"{dest}{sep}success=Akkaunt+qo%27shildi", status_code=302)
     except Exception:
         logger.exception("Akkaunt qo'shishda xato")
-        return RedirectResponse("/accounts?error=1", status_code=302)
+        return RedirectResponse("/accounts?error=Xato+yuz+berdi", status_code=302)
 
 
 @router.post("/bulk")
 async def accounts_bulk_add(
     request: Request,
     product_id: int = Form(...),
-    lines_text: str = Form(...),
+    accounts: str = Form(...),
+    supplier: str = Form(""),
+    next: str = Form(""),
 ):
     redirect = require_auth(request)
     if redirect:
         return redirect
 
     try:
-        lines = [l for l in lines_text.splitlines() if l.strip()]
+        lines = [l for l in accounts.splitlines() if l.strip()]
         result = await bulk_create_accounts(product_id=product_id, lines=lines)
         added = result.get("added", 0)
         errors = result.get("errors", [])
-        error_str = "; ".join(errors[:5]) if errors else ""
+        dest = next.strip() or "/accounts"
+        sep = "&" if "?" in dest else "?"
         msg = f"added={added}"
-        if error_str:
-            msg += f"&errors={len(errors)}"
-        return RedirectResponse(f"/accounts?success=bulk&{msg}", status_code=302)
+        if errors:
+            msg += f"&xerrors={len(errors)}"
+        return RedirectResponse(f"{dest}{sep}success=bulk&{msg}", status_code=302)
     except Exception:
         logger.exception("Bulk akkaunt qo'shishda xato")
         return RedirectResponse("/accounts?error=bulk", status_code=302)
@@ -182,3 +188,25 @@ async def accounts_export(request: Request):
     except Exception:
         logger.exception("Akkauntlar eksportida xato")
         return RedirectResponse("/accounts?error=export", status_code=302)
+
+
+@router.post("/{account_id}/delete")
+async def accounts_delete(
+    request: Request,
+    account_id: int,
+    next: str = Form(""),
+):
+    redirect = require_auth(request)
+    if redirect:
+        return redirect
+
+    try:
+        async with get_db() as db:
+            await db.execute("DELETE FROM accounts WHERE id = ?", (account_id,))
+            await db.commit()
+        dest = next.strip() or "/accounts"
+        sep = "&" if "?" in dest else "?"
+        return RedirectResponse(f"{dest}{sep}success=O%27chirildi", status_code=302)
+    except Exception:
+        logger.exception("Akkaunt o'chirishda xato: %s", account_id)
+        return RedirectResponse("/accounts?error=Xato", status_code=302)

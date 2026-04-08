@@ -51,32 +51,34 @@ async def promos_list(request: Request):
 async def promos_add(
     request: Request,
     code: str = Form(...),
-    discount_percent: int = Form(...),
-    max_uses: int = Form(-1),
-    valid_from: str = Form(""),
-    valid_until: str = Form(""),
+    discount_type: str = Form("percent"),
+    discount_value: int = Form(0),
+    max_uses: str = Form(""),
+    expires_at: str = Form(""),
+    min_order_amount: int = Form(0),
 ):
     redirect = require_auth(request)
     if redirect:
         return redirect
 
     try:
+        max_uses_val = int(max_uses) if max_uses.strip() else -1
+        discount_percent = discount_value if discount_type == "percent" else 0
         async with get_db() as db:
             await db.execute("""
-                INSERT INTO promo_codes (code, discount_percent, max_uses, valid_from, valid_until)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO promo_codes (code, discount_percent, max_uses, valid_until)
+                VALUES (?, ?, ?, ?)
             """, (
                 code.strip().upper(),
                 discount_percent,
-                max_uses,
-                valid_from or None,
-                valid_until or None,
+                max_uses_val,
+                expires_at.strip() or None,
             ))
             await db.commit()
-        return RedirectResponse("/promos?success=1", status_code=302)
+        return RedirectResponse("/promos?success=Promo+kod+qo%27shildi", status_code=302)
     except Exception:
         logger.exception("Promo kod qo'shishda xato")
-        return RedirectResponse("/promos?error=1", status_code=302)
+        return RedirectResponse("/promos?error=Xato+yuz+berdi", status_code=302)
 
 
 @router.post("/{promo_id}/toggle")

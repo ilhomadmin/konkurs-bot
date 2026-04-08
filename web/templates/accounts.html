@@ -107,7 +107,7 @@
                 <select id="filter_product" name="product_id" class="input-field">
                     <option value="">Barchasi</option>
                     {% for p in products %}
-                    <option value="{{ p.id }}" {% if current_product_id and current_product_id|string == p.id|string %}selected{% endif %}>
+                    <option value="{{ p.id }}" {% if filter_product_id and filter_product_id|string == p.id|string %}selected{% endif %}>
                         {{ p.name_uz }}
                     </option>
                     {% endfor %}
@@ -117,10 +117,10 @@
                 <label class="label" for="filter_status">Status</label>
                 <select id="filter_status" name="status" class="input-field">
                     <option value="">Barchasi</option>
-                    <option value="available" {% if current_status == 'available' %}selected{% endif %}>Bo'sh</option>
-                    <option value="reserved" {% if current_status == 'reserved' %}selected{% endif %}>Band</option>
-                    <option value="sold" {% if current_status == 'sold' %}selected{% endif %}>Sotilgan</option>
-                    <option value="expired" {% if current_status == 'expired' %}selected{% endif %}>Muddati o'tgan</option>
+                    <option value="available" {% if filter_status == 'available' %}selected{% endif %}>Bo'sh</option>
+                    <option value="reserved" {% if filter_status == 'reserved' %}selected{% endif %}>Band</option>
+                    <option value="sold" {% if filter_status == 'sold' %}selected{% endif %}>Sotilgan</option>
+                    <option value="expired" {% if filter_status == 'expired' %}selected{% endif %}>Muddati o'tgan</option>
                 </select>
             </div>
             <button type="submit" class="btn-primary">Filtrlash</button>

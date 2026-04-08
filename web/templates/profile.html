@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% set active_page = "profile" %}
+{% block title %}Profil — IDROK.AI Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-xl">
+  <h1 class="text-2xl font-semibold text-gray-900">Mening profilim</h1>
+
+  <!-- Profile info -->
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+    <h2 class="text-base font-semibold text-gray-800 mb-4">Ma'lumotlar</h2>
+    <div class="space-y-3 text-sm">
+      <div class="flex items-center justify-between py-2 border-b border-gray-50">
+        <span class="text-gray-500">Username</span>
+        <span class="font-medium text-gray-800">{{ admin_info.username | default("—") }}</span>
+      </div>
+      <div class="flex items-center justify-between py-2 border-b border-gray-50">
+        <span class="text-gray-500">Ism</span>
+        <span class="font-medium text-gray-800">{{ admin_info.full_name | default("—") }}</span>
+      </div>
+      <div class="flex items-center justify-between py-2 border-b border-gray-50">
+        <span class="text-gray-500">Telegram ID</span>
+        <code class="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{{ admin_info.telegram_id | default("—") }}</code>
+      </div>
+      <div class="flex items-center justify-between py-2">
+        <span class="text-gray-500">Rol</span>
+        {% set role = admin_info.role | default("operator") %}
+        {% if role == 'superadmin' or role == 'owner' %}
+          <span class="badge badge-purple">{{ role | capitalize }}</span>
+        {% elif role == 'admin' %}
+          <span class="badge badge-blue">Admin</span>
+        {% elif role == 'operator' %}
+          <span class="badge badge-gray">Operator</span>
+        {% else %}
+          <span class="badge badge-gray">{{ role | capitalize }}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Change password -->
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+    <h2 class="text-base font-semibold text-gray-800 mb-4">Parolni o'zgartirish</h2>
+
+    <form method="POST" action="/profile/change-password" class="space-y-4">
+      <div>
+        <label class="label">Eski parol <span class="text-red-500">*</span></label>
+        <input type="password" name="old_password" required class="input-field" placeholder="••••••••">
+      </div>
+      <div>
+        <label class="label">Yangi parol <span class="text-red-500">*</span></label>
+        <input type="password" name="new_password" required class="input-field" placeholder="••••••••" minlength="4">
+      </div>
+      <div>
+        <label class="label">Yangi parolni tasdiqlang <span class="text-red-500">*</span></label>
+        <input type="password" name="confirm_password" required class="input-field" placeholder="••••••••" minlength="4">
+      </div>
+      <div class="pt-2">
+        <button type="submit" class="btn-primary">Saqlash</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
