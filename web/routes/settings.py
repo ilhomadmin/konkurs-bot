@@ -19,16 +19,6 @@ templates = Jinja2Templates(
     directory=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "templates")
 )
 
-CATEGORY_LABELS = {
-    "payment": "To'lov sozlamalari",
-    "marketing": "Marketing",
-    "timing": "Vaqt sozlamalari",
-    "inventory": "Stok boshqaruvi",
-    "content": "Bot kontenti",
-    "menu": "Menyu matnlari",
-    "general": "Umumiy sozlamalar",
-}
-
 
 @router.get("/")
 async def settings_list(request: Request):
@@ -44,30 +34,45 @@ async def settings_list(request: Request):
             )
             all_settings = [dict(r) for r in await cursor.fetchall()]
 
-        # Kategoriya bo'yicha guruhlash
         grouped: dict = defaultdict(list)
         for s in all_settings:
             grouped[s["category"]].append(s)
 
+        categories = list(grouped.keys())
+
         return templates.TemplateResponse(request, "settings.html", {
             "admin": admin,
-            "grouped_settings": dict(grouped),
-            "category_labels": CATEGORY_LABELS,
+            "categories": categories,
+            "settings": all_settings,
         })
     except Exception:
         logger.exception("Sozlamalarni yuklashda xato")
         return templates.TemplateResponse(request, "settings.html", {
             "admin": admin,
-            "grouped_settings": {},
-            "category_labels": CATEGORY_LABELS,
-            "error": "Xato yuz berdi",
+            "categories": [],
+            "settings": [],
+            "error": "Sozlamalarni yuklashda xato yuz berdi",
         })
 
 
-@router.post("/update")
-async def settings_update(
+@router.post("/clear-cache")
+async def settings_clear_cache(request: Request):
+    redirect = require_auth(request)
+    if redirect:
+        return redirect
+
+    try:
+        from bot.db.models_products import invalidate_settings_cache
+        invalidate_settings_cache()
+    except Exception:
+        logger.exception("Kesh tozalashda xato")
+    return RedirectResponse("/settings?success=Kesh+muvaffaqiyatli+tozalandi", status_code=302)
+
+
+@router.post("/{key}")
+async def settings_update_by_key(
     request: Request,
-    key: str = Form(...),
+    key: str,
     value: str = Form(...),
 ):
     redirect = require_auth(request)
@@ -82,32 +87,7 @@ async def settings_update(
                 WHERE key = ?
             """, (value.strip(), key.strip()))
             await db.commit()
-        return RedirectResponse("/settings?success=1", status_code=302)
+        return RedirectResponse("/settings?success=Saqlandi", status_code=302)
     except Exception:
-        logger.exception("Sozlama yangilashda xato")
-        return RedirectResponse("/settings?error=1", status_code=302)
-
-
-@router.post("/update-many")
-async def settings_update_many(request: Request):
-    """Bir vaqtda ko'p sozlamalarni yangilash (forma submit)"""
-    redirect = require_auth(request)
-    if redirect:
-        return redirect
-
-    try:
-        form_data = await request.form()
-        async with get_db() as db:
-            for key, value in form_data.items():
-                if key.startswith("_"):
-                    continue
-                await db.execute("""
-                    UPDATE settings
-                    SET value = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE key = ?
-                """, (str(value).strip(), key.strip()))
-            await db.commit()
-        return RedirectResponse("/settings?success=1", status_code=302)
-    except Exception:
-        logger.exception("Ko'p sozlamalarni yangilashda xato")
-        return RedirectResponse("/settings?error=1", status_code=302)
+        logger.exception("Sozlama yangilashda xato: %s", key)
+        return RedirectResponse("/settings?error=Xato+yuz+berdi", status_code=302)

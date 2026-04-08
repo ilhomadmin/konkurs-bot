@@ -52,9 +52,9 @@ async def broadcast_form(request: Request):
 @router.post("/send")
 async def broadcast_send(
     request: Request,
-    message_text: str = Form(...),
-    language_filter: str = Form(""),
-    parse_mode: str = Form("HTML"),
+    message_uz: str = Form(...),
+    message_ru: str = Form(""),
+    target: str = Form("all"),
 ):
     redirect = require_auth(request)
     if redirect:
@@ -62,13 +62,18 @@ async def broadcast_send(
 
     try:
         async with get_db() as db:
-            if language_filter:
+            if target == "vip_only":
                 cursor = await db.execute(
-                    "SELECT telegram_id FROM users WHERE language = ?",
-                    (language_filter,)
+                    "SELECT telegram_id, language FROM users WHERE vip_level != 'standard'"
                 )
+            elif target == "active_30d":
+                cursor = await db.execute("""
+                    SELECT DISTINCT u.telegram_id, u.language FROM users u
+                    JOIN orders o ON o.user_id = u.id
+                    WHERE o.created_at >= datetime('now', '-30 days')
+                """)
             else:
-                cursor = await db.execute("SELECT telegram_id FROM users")
+                cursor = await db.execute("SELECT telegram_id, language FROM users")
             users = await cursor.fetchall()
 
         sent = 0
@@ -76,13 +81,17 @@ async def broadcast_send(
 
         async with httpx.AsyncClient(timeout=30) as client:
             for user in users:
+                lang = user["language"] if user["language"] in ("uz", "ru") else "uz"
+                text = message_ru if (lang == "ru" and message_ru) else message_uz
+                if not text:
+                    continue
                 try:
                     resp = await client.post(
                         f"{TELEGRAM_API}/sendMessage",
                         json={
                             "chat_id": user["telegram_id"],
-                            "text": message_text,
-                            "parse_mode": parse_mode,
+                            "text": text,
+                            "parse_mode": "HTML",
                         },
                     )
                     if resp.status_code == 200 and resp.json().get("ok"):
