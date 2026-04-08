@@ -28,7 +28,7 @@
         {% for val, label in statuses %}
         <a href="/orders{% if val %}?status={{ val }}{% endif %}"
            class="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors
-                  {% if current_status == val or (not current_status and not val) %}
+                  {% if filter_status == val or (not filter_status and not val) %}
                   bg-indigo-600 text-white
                   {% else %}
                   text-gray-600 hover:bg-gray-100

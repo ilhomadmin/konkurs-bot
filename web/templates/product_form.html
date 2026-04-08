@@ -1,153 +1,89 @@
 {% extends "base.html" %}
-{% set active_page = "products" %}
-
-{% block title %}{% if product %}Tahrirlash — {{ product.name_uz }}{% else %}Yangi obuna turi{% endif %} — IDROK.AI Admin{% endblock %}
-
-{% block breadcrumbs %}
-<a href="/products" class="text-gray-400 text-sm hover:text-gray-600">Obuna turlari</a>
-<svg class="w-4 h-4 text-gray-300 mx-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-</svg>
-<span class="text-gray-700 text-sm font-medium">{% if product %}Tahrirlash{% else %}Yangi{% endif %}</span>
-{% endblock %}
-
+{% block title %}{% if product | default(none) %}Tahrirlash: {{ product.name_uz | default("") }}{% else %}Yangi obuna{% endif %} — IDROK.AI{% endblock %}
 {% block content %}
-<div class="max-w-3xl space-y-6">
-  <!-- Header -->
-  <div>
-    <h1 class="text-2xl font-semibold text-gray-900">
-      {% if product %}{{ product.name_uz }} ni tahrirlash{% else %}Yangi obuna turi{% endif %}
-    </h1>
-    <p class="text-sm text-gray-500 mt-1">Maydonlarni to'ldiring va saqlang</p>
-  </div>
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-xl font-bold text-gray-900">
+    {% if product | default(none) %}Tahrirlash: {{ product.name_uz | default("") }}{% else %}Yangi obuna{% endif %}
+  </h1>
+  <a href="/products" class="btn-secondary">Orqaga</a>
+</div>
 
-  <!-- Form -->
-  <form method="POST" action="{% if product %}/products/{{ product.id }}{% else %}/products/add{% endif %}"
-        class="bg-white rounded-xl shadow-sm border border-gray-100 divide-y divide-gray-100">
+<div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 max-w-2xl">
+  <form method="post" action="{% if product | default(none) %}/products/{{ product.id | default('') }}{% else %}/products/add{% endif %}">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-    <!-- Names -->
-    <div class="p-6 space-y-4">
-      <h2 class="text-base font-semibold text-gray-800">Nomlar</h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="label" for="name_uz">Nom (O'zbek) <span class="text-red-500">*</span></label>
-          <input id="name_uz" name="name_uz" type="text" required class="input-field"
-                 placeholder="masalan: Netflix Premium"
-                 value="{{ product.name_uz if product else '' }}">
-        </div>
-        <div>
-          <label class="label" for="name_ru">Nom (Rus)</label>
-          <input id="name_ru" name="name_ru" type="text" class="input-field"
-                 placeholder="masalan: Netflix Премиум"
-                 value="{{ product.name_ru if product else '' }}">
-        </div>
+      <div>
+        <label class="label">Nomi (UZ)</label>
+        <input type="text" name="name_uz" value="{{ product.name_uz | default('') if product else '' }}" class="input-field" required>
       </div>
-    </div>
-
-    <!-- Duration texts -->
-    <div class="p-6 space-y-4">
-      <h2 class="text-base font-semibold text-gray-800">Muddat matni</h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="label" for="duration_text_uz">Muddat (O'zbek)</label>
-          <input id="duration_text_uz" name="duration_text_uz" type="text" class="input-field"
-                 placeholder="masalan: 1 oylik"
-                 value="{{ product.duration_text_uz if product else '' }}">
-        </div>
-        <div>
-          <label class="label" for="duration_text_ru">Muddat (Rus)</label>
-          <input id="duration_text_ru" name="duration_text_ru" type="text" class="input-field"
-                 placeholder="masalan: 1 месяц"
-                 value="{{ product.duration_text_ru if product else '' }}">
-        </div>
+      <div>
+        <label class="label">Nomi (RU)</label>
+        <input type="text" name="name_ru" value="{{ product.name_ru | default('') if product else '' }}" class="input-field">
       </div>
-    </div>
 
-    <!-- Category & Price -->
-    <div class="p-6 space-y-4">
-      <h2 class="text-base font-semibold text-gray-800">Turkum va Narx</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label class="label" for="category_id">Turkum</label>
-          <select id="category_id" name="category_id" class="input-field">
-            <option value="">Tanlang (ixtiyoriy)</option>
-            {% for cat in categories %}
-            <option value="{{ cat.id }}" {% if product and product.category_id == cat.id %}selected{% endif %}>
-              {{ cat.name_uz }}
-            </option>
-            {% endfor %}
-          </select>
-        </div>
-        <div>
-          <label class="label" for="price">Narx (so'm) <span class="text-red-500">*</span></label>
-          <input id="price" name="price" type="number" required min="0" step="100" class="input-field"
-                 placeholder="0"
-                 value="{{ product.price if product else '' }}">
-        </div>
-        <div>
-          <label class="label" for="cost_price">Tannarx (so'm)</label>
-          <input id="cost_price" name="cost_price" type="number" min="0" step="100" class="input-field"
-                 placeholder="0"
-                 value="{{ product.cost_price if product else '' }}">
-        </div>
+      <div>
+        <label class="label">Narx (so'm)</label>
+        <input type="number" name="price" value="{{ product.price | default(0) if product else '' }}" class="input-field" min="0" step="1000">
       </div>
-    </div>
+      <div>
+        <label class="label">Tannarx</label>
+        <input type="number" name="cost_price" value="{{ product.cost_price | default(0) if product else '' }}" class="input-field" min="0" step="1000">
+      </div>
 
-    <!-- Warranty -->
-    <div class="p-6 space-y-4" x-data="{ hasWarranty: {{ 'true' if product and product.has_warranty else 'false' }} }">
-      <h2 class="text-base font-semibold text-gray-800">Kafolat</h2>
-      <div class="flex items-center gap-4">
-        <label class="flex items-center gap-2 cursor-pointer select-none">
-          <input type="checkbox" name="has_warranty" id="has_warranty"
-                 class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                 x-model="hasWarranty"
-                 {% if product and product.has_warranty %}checked{% endif %}>
-          <span class="text-sm font-medium text-gray-700">Kafolat mavjud</span>
+      <div>
+        <label class="label">Muddat matni (UZ)</label>
+        <input type="text" name="duration_text_uz" value="{{ product.duration_text_uz | default('') if product else '' }}" class="input-field" placeholder="1 oylik">
+      </div>
+      <div>
+        <label class="label">Muddat matni (RU)</label>
+        <input type="text" name="duration_text_ru" value="{{ product.duration_text_ru | default('') if product else '' }}" class="input-field" placeholder="1 месяц">
+      </div>
+
+      <div>
+        <label class="label">Kategoriya</label>
+        <select name="category_id" class="input-field">
+          <option value="">— Tanlang —</option>
+          {% for cat in categories | default([]) %}
+          <option value="{{ cat.id | default('') }}"
+            {% if product and product.category_id | default('') == cat.id | default('') %}selected{% endif %}>
+            {{ cat.name_uz | default("") }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="label">Tartib raqami</label>
+        <input type="number" name="sort_order" value="{{ product.sort_order | default(0) if product else 0 }}" class="input-field" min="0">
+      </div>
+
+      <div class="md:col-span-2">
+        <label class="label">Tavsif (UZ)</label>
+        <textarea name="description_uz" rows="3" class="input-field">{{ product.description_uz | default('') if product else '' }}</textarea>
+      </div>
+      <div class="md:col-span-2">
+        <label class="label">Tavsif (RU)</label>
+        <textarea name="description_ru" rows="3" class="input-field">{{ product.description_ru | default('') if product else '' }}</textarea>
+      </div>
+
+      <div>
+        <label class="label">Kafolat kunlari</label>
+        <input type="number" name="warranty_days" value="{{ product.warranty_days | default(0) if product else 0 }}" class="input-field" min="0">
+      </div>
+      <div class="flex flex-col gap-3 justify-center">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" name="has_warranty" value="1" {% if product and product.has_warranty | default(false) %}checked{% endif %} class="w-4 h-4 rounded text-indigo-600">
+          <span class="text-sm text-gray-700">Kafolat mavjud</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" name="is_active" value="1" {% if not product or product.is_active | default(true) %}checked{% endif %} class="w-4 h-4 rounded text-indigo-600">
+          <span class="text-sm text-gray-700">Faol</span>
         </label>
       </div>
-      <div x-show="hasWarranty" x-cloak>
-        <label class="label" for="warranty_days">Kafolat muddati (kun)</label>
-        <input id="warranty_days" name="warranty_days" type="number" min="1" class="input-field w-40"
-               placeholder="30"
-               value="{{ product.warranty_days if product else '' }}">
-      </div>
     </div>
 
-    <!-- Video keyword -->
-    <div class="p-6 space-y-4">
-      <h2 class="text-base font-semibold text-gray-800">Video</h2>
-      <div>
-        <label class="label" for="video_keyword">Video kalit so'z</label>
-        <input id="video_keyword" name="video_keyword" type="text" class="input-field"
-               placeholder="masalan: netflix_tutorial"
-               value="{{ product.video_keyword if product else '' }}">
-        <p class="text-xs text-gray-400 mt-1">Bot ushbu kalit so'z bo'yicha videoni topib yuboradi</p>
-      </div>
-    </div>
-
-    <!-- Descriptions -->
-    <div class="p-6 space-y-4">
-      <h2 class="text-base font-semibold text-gray-800">Tavsif</h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="label" for="description_uz">Tavsif (O'zbek)</label>
-          <textarea id="description_uz" name="description_uz" rows="4" class="input-field resize-y"
-                    placeholder="Mahsulot haqida...">{{ product.description_uz if product else '' }}</textarea>
-        </div>
-        <div>
-          <label class="label" for="description_ru">Tavsif (Rus)</label>
-          <textarea id="description_ru" name="description_ru" rows="4" class="input-field resize-y"
-                    placeholder="Описание товара...">{{ product.description_ru if product else '' }}</textarea>
-        </div>
-      </div>
-    </div>
-
-    <!-- Actions -->
-    <div class="px-6 py-4 bg-gray-50 flex items-center justify-between rounded-b-xl">
+    <div class="flex gap-3 mt-6 pt-4 border-t border-gray-100">
+      <button type="submit" class="btn-primary">Saqlash</button>
       <a href="/products" class="btn-secondary">Bekor qilish</a>
-      <button type="submit" class="btn-primary">
-        {% if product %}Saqlash{% else %}Qo'shish{% endif %}
-      </button>
     </div>
   </form>
 </div>

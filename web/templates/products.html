@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% block title %}Obuna turlari — IDROK.AI{% endblock %}
-
 {% block content %}
 <div class="flex items-center justify-between mb-6">
   <h1 class="text-xl font-bold text-gray-900">Obuna turlari</h1>
@@ -10,20 +9,16 @@
   </a>
 </div>
 
-<!-- Filter row -->
-<form method="get" class="mb-4 flex items-center gap-3 flex-wrap">
-  <select name="category_id" class="input-field w-auto" onchange="this.form.submit()">
-    <option value="">Barcha kategoriyalar</option>
-    {% for cat in categories | default([]) %}
-    <option value="{{ cat.id | default('') }}" {% if request.query_params.get('category_id','') == (cat.id | default('')) | string %}selected{% endif %}>
-      {{ cat.name_uz | default("") }}
-    </option>
-    {% endfor %}
-  </select>
-  {% if request.query_params.get('category_id') %}
-  <a href="/products" class="btn-secondary btn-sm">Tozalash</a>
-  {% endif %}
-</form>
+<div class="mb-4">
+  <form method="get" class="flex gap-3 items-center">
+    <select name="category_id" class="input-field w-auto" onchange="this.form.submit()">
+      <option value="">Barcha turkumlar</option>
+      {% for cat in categories | default([]) %}
+      <option value="{{ cat.id | default('') }}" {% if request.query_params.get('category_id','') == (cat.id | string) %}selected{% endif %}>{{ cat.name_uz | default("") }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
 
 <div class="table-container">
   <table class="w-full">
@@ -40,41 +35,42 @@
       </tr>
     </thead>
     <tbody>
-      {% for product in products | default([]) %}
-      {% set ns = namespace(cat_name="") %}
-      {% for cat in categories | default([]) %}{% if cat.id == product.category_id | default(0) %}{% set ns.cat_name = cat.name_uz | default("") %}{% endif %}{% endfor %}
-      <tr class="hover:bg-gray-50 border-b border-gray-100">
-        <td class="px-4 py-3 text-sm text-gray-900">{{ loop.index }}</td>
-        <td class="px-4 py-3 text-sm text-gray-900 font-medium">{{ product.name_uz | default("") }}</td>
-        <td class="px-4 py-3 text-sm text-gray-600">{{ ns.cat_name }}</td>
-        <td class="px-4 py-3 text-sm text-gray-900">{{ "{:,}".format(product.price | default(0) | int) }}</td>
-        <td class="px-4 py-3 text-sm text-gray-500">—</td>
-        <td class="px-4 py-3 text-sm text-gray-600">{{ product.duration_text_uz | default("") }}</td>
-        <td class="px-4 py-3">
-          {% if product.is_active | default(false) %}
-          <span class="badge badge-green">Faol</span>
-          {% else %}
-          <span class="badge badge-gray">Nofaol</span>
-          {% endif %}
-        </td>
-        <td class="px-4 py-3">
-          <div class="flex items-center gap-2">
-            <a href="/products/{{ product.id | default('') }}" class="btn-secondary btn-sm">Tahrirlash</a>
-            <form method="post" action="/products/{{ product.id | default('') }}/toggle" onsubmit="return confirm('Holatni o\'zgartirish?')">
-              <button type="submit" class="btn-sm {% if product.is_active | default(false) %}btn-danger{% else %}btn-success{% endif %}">
-                {% if product.is_active | default(false) %}O'chirish{% else %}Yoqish{% endif %}
-              </button>
-            </form>
-          </div>
-        </td>
-      </tr>
+      {% set products_list = products | default([]) %}
+      {% if products_list %}
+        {% for p in products_list %}
+        <tr class="hover:bg-gray-50 border-b border-gray-100">
+          <td class="px-4 py-3 text-sm text-gray-900">{{ loop.index }}</td>
+          <td class="px-4 py-3 text-sm text-gray-900 font-medium">{{ p.name_uz | default("") }}</td>
+          <td class="px-4 py-3 text-sm text-gray-900">
+            {% set ns = namespace(cat_name="—") %}
+            {% for cat in categories | default([]) %}
+              {% if cat.id == p.category_id | default("") %}{% set ns.cat_name = cat.name_uz | default("—") %}{% endif %}
+            {% endfor %}
+            {{ ns.cat_name }}
+          </td>
+          <td class="px-4 py-3 text-sm text-gray-900">{{ "{:,.0f}".format(p.price | default(0) | float) }}</td>
+          <td class="px-4 py-3 text-sm text-gray-900">—</td>
+          <td class="px-4 py-3 text-sm text-gray-900">{{ p.duration_text_uz | default("") }}</td>
+          <td class="px-4 py-3 text-sm">
+            {% if p.is_active | default(false) %}
+              <span class="badge badge-green">Faol</span>
+            {% else %}
+              <span class="badge badge-gray">Nofaol</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3 text-sm">
+            <div class="flex items-center gap-2">
+              <a href="/products/{{ p.id | default('') }}" class="btn-secondary btn-sm">Tahrirlash</a>
+              <form method="post" action="/products/{{ p.id | default('') }}/toggle" onsubmit="return confirm('Rostdan ham?')">
+                <button type="submit" class="btn-danger btn-sm">O'chirish</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
       {% else %}
-      <tr>
-        <td colspan="8">
-          <div class="text-center py-12 text-gray-400"><p>Mahsulotlar yo'q</p></div>
-        </td>
-      </tr>
-      {% endfor %}
+        <tr><td colspan="8"><div class="text-center py-12 text-gray-400"><p>Mahsulotlar yo'q</p></div></td></tr>
+      {% endif %}
     </tbody>
   </table>
 </div>
