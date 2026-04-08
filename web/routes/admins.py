@@ -5,7 +5,7 @@ import logging
 import os
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from bot.db.database import get_db
@@ -48,6 +48,45 @@ async def admins_list(request: Request):
             "roles": ROLES,
             "error": "Xato yuz berdi",
         })
+
+
+@router.post("/find-by-username")
+async def admins_find_by_username(
+    request: Request,
+    username: str = Form(...),
+):
+    """Username bo'yicha users jadvalidan qidirish."""
+    redirect = require_role(request, ["superadmin"])
+    if redirect:
+        return JSONResponse({"found": False, "message": "Ruxsat yo'q"}, status_code=403)
+
+    username = username.strip().lstrip("@")
+    if not username:
+        return JSONResponse({"found": False, "message": "Username bo'sh"})
+
+    try:
+        async with get_db() as db:
+            cursor = await db.execute(
+                "SELECT telegram_id, username, full_name FROM users WHERE username = ? COLLATE NOCASE LIMIT 1",
+                (username,)
+            )
+            row = await cursor.fetchone()
+
+        if row:
+            return JSONResponse({
+                "found": True,
+                "telegram_id": row["telegram_id"],
+                "username": row["username"] or "",
+                "full_name": row["full_name"] or "",
+            })
+        else:
+            return JSONResponse({
+                "found": False,
+                "message": "Bu foydalanuvchi botdan foydalanmagan"
+            })
+    except Exception:
+        logger.exception("Username qidiruvda xato")
+        return JSONResponse({"found": False, "message": "Xato yuz berdi"})
 
 
 @router.post("/add")

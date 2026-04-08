@@ -3,7 +3,15 @@
 {% block title %}{% if product %}Tahrirlash: {{ product.name_uz | default("") }}{% else %}Yangi mahsulot{% endif %} — IDROK.AI Admin{% endblock %}
 
 {% block content %}
-<div class="space-y-6" x-data="{ hasWarranty: {{ 'true' if product and product.has_warranty else 'false' }} }">
+{% set default_fields = product.account_fields if product and product.account_fields else '["Login", "Parol"]' %}
+<div class="space-y-6" x-data="{
+  hasWarranty: {{ 'true' if product and product.has_warranty else 'false' }},
+  accountFields: {{ default_fields }},
+  newField: '',
+  addField() { if (this.newField.trim()) { this.accountFields.push(this.newField.trim()); this.newField = ''; } },
+  removeField(i) { this.accountFields.splice(i, 1); },
+  get fieldsJson() { return JSON.stringify(this.accountFields); }
+}">
   <!-- Header -->
   <div class="flex items-center justify-between">
     <div>
@@ -132,6 +140,26 @@
           </label>
         </div>
       </div>
+
+        <!-- Akkaunt maydonlari -->
+        <div class="md:col-span-2">
+          <label class="label">Akkaunt maydonlari</label>
+          <p class="text-xs text-gray-400 mb-2">Akkaunt qo'shganda ko'rsatiladigan maydonlar (masalan: Login, Parol, Invite Link)</p>
+          <input type="hidden" name="account_fields_json" :value="fieldsJson">
+          <div class="flex flex-wrap gap-2 mb-2">
+            <template x-for="(f, i) in accountFields" :key="i">
+              <span class="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 text-xs px-2 py-1 rounded-full border border-indigo-200">
+                <span x-text="f"></span>
+                <button type="button" @click="removeField(i)" class="text-indigo-400 hover:text-red-500 font-bold ml-1">×</button>
+              </span>
+            </template>
+          </div>
+          <div class="flex gap-2">
+            <input type="text" x-model="newField" @keydown.enter.prevent="addField()"
+                   class="input-field flex-1 text-sm" placeholder="Yangi maydon nomi (masalan: Kalit kodi)">
+            <button type="button" @click="addField()" class="btn-secondary btn-sm text-xs">+ Qo'shish</button>
+          </div>
+        </div>
 
       <div class="flex gap-3 mt-6 pt-4 border-t border-gray-100">
         <button type="submit" class="btn-primary">Saqlash</button>

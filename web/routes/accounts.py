@@ -3,6 +3,7 @@ Akkauntlar boshqaruvi
 """
 import csv
 import io
+import json
 import logging
 import os
 from fastapi import APIRouter, Form, Request
@@ -19,6 +20,27 @@ router = APIRouter()
 templates = Jinja2Templates(
     directory=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "templates")
 )
+
+
+def _parse_fields_json(acc: dict) -> dict:
+    """fields_json ni parse qilib, login/password fallback bilan birlashtiradi."""
+    raw = acc.get("fields_json")
+    if raw:
+        try:
+            acc["fields"] = json.loads(raw)
+        except Exception:
+            acc["fields"] = {}
+    else:
+        # Eski akkauntlar uchun login/password/additional_data dan fields yaratish
+        f = {}
+        if acc.get("login"):
+            f["Login"] = acc["login"]
+        if acc.get("password"):
+            f["Parol"] = acc["password"]
+        if acc.get("additional_data"):
+            f["Qo'shimcha"] = acc["additional_data"]
+        acc["fields"] = f
+    return acc
 
 
 @router.get("/")
@@ -45,16 +67,19 @@ async def accounts_list(request: Request):
             where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
             cursor = await db.execute(f"""
-                SELECT a.*, p.name_uz AS product_name
+                SELECT a.*, p.name_uz AS product_name,
+                       p.account_fields AS product_account_fields
                 FROM accounts a
                 LEFT JOIN products p ON p.id = a.product_id
                 {where}
                 ORDER BY a.created_at DESC
                 LIMIT 200
             """, params)
-            accounts = [dict(r) for r in await cursor.fetchall()]
+            accounts = [_parse_fields_json(dict(r)) for r in await cursor.fetchall()]
 
-            cursor2 = await db.execute("SELECT id, name_uz FROM products ORDER BY name_uz")
+            cursor2 = await db.execute(
+                "SELECT id, name_uz, account_fields FROM products ORDER BY name_uz"
+            )
             products = [dict(r) for r in await cursor2.fetchall()]
 
         return templates.TemplateResponse(request, "accounts.html", {
@@ -80,28 +105,28 @@ async def accounts_list(request: Request):
 async def accounts_add(
     request: Request,
     product_id: int = Form(...),
-    login: str = Form(""),
-    password: str = Form(""),
-    invite_link: str = Form(""),
+    fields_json_str: str = Form("{}"),
     supplier: str = Form(""),
     next: str = Form(""),
 ):
-    """FIX 2+3: expiry avtomatik, login/password/invite_link ixtiyoriy."""
+    """Flexible fields — fields_json_str JSON object sifatida keladi."""
     redirect = require_auth(request)
     if redirect:
         return redirect
 
-    login = login.strip() or None
-    password = password.strip() or None
-    invite_link = invite_link.strip() or None
+    try:
+        fields_data = json.loads(fields_json_str) if fields_json_str.strip() else {}
+        if not isinstance(fields_data, dict):
+            fields_data = {}
+    except Exception:
+        fields_data = {}
 
-    if not login and not password and not invite_link:
+    if not fields_data:
         dest = next.strip() or "/accounts"
         sep = "&" if "?" in dest else "?"
         return RedirectResponse(f"{dest}{sep}error=Kamida+bitta+maydon+to%27ldirilishi+kerak", status_code=302)
 
     try:
-        # duration_days mahsulotdan olinadi
         async with get_db() as db:
             cursor = await db.execute(
                 "SELECT duration_days FROM products WHERE id = ?", (product_id,)
@@ -109,14 +134,34 @@ async def accounts_add(
             row = await cursor.fetchone()
             duration_days = row["duration_days"] if row and row["duration_days"] else 30
 
-        await create_account(
-            product_id=product_id,
-            duration_days=duration_days,
-            login=login,
-            password=password,
-            additional_data=invite_link,
-            supplier=supplier.strip() or None,
-        )
+        # Backward compat: extract login/password from fields
+        login_val = fields_data.get("Login") or fields_data.get("login") or None
+        password_val = fields_data.get("Parol") or fields_data.get("password") or None
+        additional = fields_data.get("Invite Link") or fields_data.get("additional_data") or None
+
+        from datetime import date, timedelta
+        today = date.today()
+        if duration_days and duration_days > 0:
+            expiry_str = (today + timedelta(days=duration_days)).isoformat()
+            remaining = duration_days
+        else:
+            expiry_str = None
+            remaining = 9999
+
+        async with get_db() as db:
+            await db.execute("""
+                INSERT INTO accounts
+                    (product_id, login, password, additional_data, expiry_date,
+                     remaining_days, supplier, status, fields_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'available', ?)
+            """, (
+                product_id, login_val, password_val, additional,
+                expiry_str, remaining,
+                supplier.strip() or None,
+                json.dumps(fields_data, ensure_ascii=False),
+            ))
+            await db.commit()
+
         dest = next.strip() or "/accounts"
         sep = "&" if "?" in dest else "?"
         return RedirectResponse(f"{dest}{sep}success=Akkaunt+qo%27shildi", status_code=302)
@@ -138,25 +183,75 @@ async def accounts_bulk_add(
         return redirect
 
     try:
-        # duration_days mahsulotdan olinadi
         async with get_db() as db:
             cursor = await db.execute(
-                "SELECT duration_days FROM products WHERE id = ?", (product_id,)
+                "SELECT duration_days, account_fields FROM products WHERE id = ?", (product_id,)
             )
             row = await cursor.fetchone()
             duration_days = row["duration_days"] if row and row["duration_days"] else 30
+            try:
+                field_names = json.loads(row["account_fields"] or '["Login","Parol"]')
+                if not isinstance(field_names, list):
+                    field_names = ["Login", "Parol"]
+            except Exception:
+                field_names = ["Login", "Parol"]
+
+        from datetime import date, timedelta
+        today = date.today()
+        if duration_days and duration_days > 0:
+            expiry_str = (today + timedelta(days=duration_days)).isoformat()
+            remaining = duration_days
+        else:
+            expiry_str = None
+            remaining = 9999
 
         lines = [l for l in lines_text.splitlines() if l.strip()]
-        result = await bulk_create_accounts(
-            product_id=product_id, lines=lines, duration_days=duration_days
-        )
-        added = result.get("added", 0)
-        errors = result.get("errors", [])
+        added = 0
+        errors_list = []
+
+        async with get_db() as db:
+            for i, line in enumerate(lines, 1):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    parts = [p.strip() for p in line.split("|")]
+                    fields_data = {}
+                    for idx, fname in enumerate(field_names):
+                        fields_data[fname] = parts[idx] if idx < len(parts) else ""
+                    # Remove empty values
+                    fields_data = {k: v for k, v in fields_data.items() if v}
+
+                    login_val = fields_data.get("Login") or fields_data.get("login") or None
+                    password_val = fields_data.get("Parol") or fields_data.get("password") or None
+                    additional = None
+                    for k, v in fields_data.items():
+                        if k not in ("Login", "login", "Parol", "password"):
+                            additional = v
+                            break
+
+                    await db.execute("""
+                        INSERT INTO accounts
+                            (product_id, login, password, additional_data, expiry_date,
+                             remaining_days, supplier, status, fields_json)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, 'available', ?)
+                    """, (
+                        product_id, login_val, password_val, additional,
+                        expiry_str, remaining,
+                        supplier.strip() or None,
+                        json.dumps(fields_data, ensure_ascii=False),
+                    ))
+                    added += 1
+                except Exception as e:
+                    errors_list.append(f"Qator {i}: {e}")
+
+            await db.commit()
+
         dest = next.strip() or "/accounts"
         sep = "&" if "?" in dest else "?"
         msg = f"added={added}"
-        if errors:
-            msg += f"&xerrors={len(errors)}"
+        if errors_list:
+            msg += f"&xerrors={len(errors_list)}"
         return RedirectResponse(f"{dest}{sep}success=bulk&{msg}", status_code=302)
     except Exception:
         logger.exception("Bulk akkaunt qo'shishda xato")

@@ -3,8 +3,9 @@ To'lov handlerlari:
 - Mijoz chek yuboradi
 - Bot guruhga forward qiladi
 - Admin guruhda tasdiqlaydi → akkauntlar yetkaziladi
-YANGI STRUKTURA: duration_tier yo'q
+YANGI STRUKTURA: duration_tier yo'q, flexible fields_json
 """
+import json
 import logging
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -50,16 +51,31 @@ async def edit_progress_bar(bot: Bot, user_telegram_id: int, order: dict, new_st
 
 
 def build_account_delivery_text(items: list[dict], lang: str) -> str:
-    """Akkaunt yetkazish matni"""
+    """Akkaunt yetkazish matni — flexible fields_json bilan"""
     lines = []
     num = 1
     for item in items:
         if item.get("status") != "delivered":
             continue
         name = item.get(f"name_{lang}", item.get("name_uz", "?"))
-        login = item.get("login") or "—"
-        password = item.get("password") or "—"
-        expiry = item.get("expiry_date") or "—"
+        expiry = item.get("expiry_date") or item.get("account_expiry") or "—"
+
+        # fields_json mavjud bo'lsa undan foydalan
+        fields_raw = item.get("fields_json")
+        if fields_raw:
+            try:
+                fields = json.loads(fields_raw)
+                if isinstance(fields, dict) and fields:
+                    fields_text = "\n".join(f"• {k}: <code>{v}</code>" for k, v in fields.items() if v)
+                    lines.append(f"<b>{num}. {name}</b>\n{fields_text}\n📅 Muddat: {expiry}")
+                    num += 1
+                    continue
+            except Exception:
+                pass
+
+        # Fallback: login/password
+        login = item.get("login") or item.get("account_login") or "—"
+        password = item.get("password") or item.get("account_password") or "—"
         lines.append(t("account_delivery_line", lang,
                        num=num, name=name,
                        login=login, password=password, expiry=expiry))
@@ -152,16 +168,30 @@ async def payment_screenshot(message: Message, bot: Bot) -> None:
 
 # ==================== ADMIN: TO'LOV TASDIQLASH ====================
 
+async def _is_authorized(callback: CallbackQuery, bot: Bot) -> bool:
+    """Foydalanuvchi admin yoki to'lov guruh a'zosimi tekshirish."""
+    from bot.config import ADMIN_IDS, PAYMENT_GROUP_ID
+    if callback.from_user.id in ADMIN_IDS:
+        return True
+    if await get_admin_by_telegram_id(callback.from_user.id) is not None:
+        return True
+    if PAYMENT_GROUP_ID:
+        try:
+            member = await bot.get_chat_member(PAYMENT_GROUP_ID, callback.from_user.id)
+            if member.status not in ("left", "kicked", "banned"):
+                return True
+        except Exception:
+            pass
+    return False
+
+
 @router.callback_query(F.data.startswith("pay:ok:"))
 async def confirm_payment(callback: CallbackQuery, bot: Bot) -> None:
     """Admin to'lovni tasdiqlaydi — barcha akkauntlar yetkaziladi"""
     try:
         order_id = int(callback.data.split(":")[2])
 
-        from bot.config import ADMIN_IDS
-        is_admin = (callback.from_user.id in ADMIN_IDS or
-                    await get_admin_by_telegram_id(callback.from_user.id) is not None)
-        if not is_admin:
+        if not await _is_authorized(callback, bot):
             await callback.answer(t("access_denied"), show_alert=True)
             return
 
@@ -243,10 +273,7 @@ async def reject_payment(callback: CallbackQuery, bot: Bot) -> None:
     try:
         order_id = int(callback.data.split(":")[2])
 
-        from bot.config import ADMIN_IDS
-        is_admin = (callback.from_user.id in ADMIN_IDS or
-                    await get_admin_by_telegram_id(callback.from_user.id) is not None)
-        if not is_admin:
+        if not await _is_authorized(callback, bot):
             await callback.answer(t("access_denied"), show_alert=True)
             return
 
@@ -289,10 +316,7 @@ async def partial_confirm_start(callback: CallbackQuery, bot: Bot) -> None:
     try:
         order_id = int(callback.data.split(":")[2])
 
-        from bot.config import ADMIN_IDS
-        is_admin = (callback.from_user.id in ADMIN_IDS or
-                    await get_admin_by_telegram_id(callback.from_user.id) is not None)
-        if not is_admin:
+        if not await _is_authorized(callback, bot):
             await callback.answer(t("access_denied"), show_alert=True)
             return
 

@@ -3,18 +3,41 @@
 
 {% block title %}Akkauntlar — IDROK.AI Admin{% endblock %}
 
-{% block breadcrumbs %}
-<span class="text-sm text-gray-500">Akkauntlar</span>
-{% endblock %}
-
 {% block content %}
-<div class="space-y-6" x-data="{ showAddSingle: false, showBulk: false }">
+<div class="space-y-6"
+     x-data="{
+       showAddSingle: false,
+       showBulk: false,
+       fields: ['Login', 'Parol'],
+       fieldValues: {},
+       bulkFields: ['Login', 'Parol'],
+       async loadFields(pid) {
+         if (!pid) { this.fields = ['Login', 'Parol']; this.fieldValues = {}; return; }
+         try {
+           const r = await fetch('/products/' + pid + '/fields');
+           const d = await r.json();
+           this.fields = d.fields || ['Login', 'Parol'];
+           this.fieldValues = {};
+         } catch(e) { this.fields = ['Login', 'Parol']; }
+       },
+       async loadBulkFields(pid) {
+         if (!pid) { this.bulkFields = ['Login', 'Parol']; return; }
+         try {
+           const r = await fetch('/products/' + pid + '/fields');
+           const d = await r.json();
+           this.bulkFields = d.fields || ['Login', 'Parol'];
+         } catch(e) { this.bulkFields = ['Login', 'Parol']; }
+       },
+       get fieldsJsonStr() {
+         return JSON.stringify(this.fieldValues);
+       }
+     }">
 
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
             <h1 class="text-2xl font-semibold text-gray-900">Akkauntlar</h1>
-            <p class="text-sm text-gray-500 mt-1">Barcha login/parollar bazasi</p>
+            <p class="text-sm text-gray-500 mt-1">Barcha akkauntlar bazasi</p>
         </div>
         <div class="flex items-center gap-2">
             <button @click="showAddSingle = !showAddSingle; showBulk = false" class="btn-primary inline-flex items-center gap-2">
@@ -36,34 +59,37 @@
     <div x-show="showAddSingle" x-cloak
          class="bg-white rounded-xl shadow-sm border border-indigo-100 p-6">
         <h2 class="text-base font-semibold text-gray-800 mb-1">Bitta akkaunt qo'shish</h2>
-        <p class="text-xs text-gray-400 mb-4">Login, parol yoki invite link — kamida bittasi to'ldirilishi shart</p>
-        <form method="POST" action="/accounts/add" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div>
-                <label class="label" for="add_product_id">Mahsulot <span class="text-red-500">*</span></label>
-                <select id="add_product_id" name="product_id" required class="input-field">
-                    <option value="">Tanlang</option>
-                    {% for p in products %}
-                    <option value="{{ p.id }}">{{ p.name_uz }}</option>
-                    {% endfor %}
-                </select>
+        <p class="text-xs text-gray-400 mb-4">Mahsulotni tanlaganingizda maydonlar avtomatik ko'rsatiladi</p>
+        <form method="POST" action="/accounts/add" class="space-y-4">
+            <input type="hidden" name="fields_json_str" :value="fieldsJsonStr">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="label">Mahsulot <span class="text-red-500">*</span></label>
+                    <select name="product_id" required class="input-field"
+                            @change="loadFields($event.target.value)">
+                        <option value="">Tanlang</option>
+                        {% for p in products %}
+                        <option value="{{ p.id }}">{{ p.name_uz }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="label">Supplier</label>
+                    <input name="supplier" type="text" class="input-field" placeholder="manba">
+                </div>
             </div>
-            <div>
-                <label class="label" for="add_login">Login</label>
-                <input id="add_login" name="login" type="text" class="input-field" placeholder="email yoki login">
+            <!-- Dynamic fields -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <template x-for="f in fields" :key="f">
+                    <div>
+                        <label class="label" x-text="f"></label>
+                        <input type="text" class="input-field"
+                               :placeholder="f"
+                               @input="fieldValues[f] = $event.target.value">
+                    </div>
+                </template>
             </div>
-            <div>
-                <label class="label" for="add_password">Parol</label>
-                <input id="add_password" name="password" type="text" class="input-field" placeholder="parol">
-            </div>
-            <div>
-                <label class="label" for="add_invite_link">Invite Link</label>
-                <input id="add_invite_link" name="invite_link" type="text" class="input-field" placeholder="https://...">
-            </div>
-            <div>
-                <label class="label" for="add_supplier">Supplier</label>
-                <input id="add_supplier" name="supplier" type="text" class="input-field" placeholder="manba">
-            </div>
-            <div class="sm:col-span-2 lg:col-span-5 flex justify-end gap-2">
+            <div class="flex justify-end gap-2">
                 <button type="button" @click="showAddSingle = false" class="btn-secondary">Bekor qilish</button>
                 <button type="submit" class="btn-primary">Qo'shish</button>
             </div>
@@ -74,15 +100,18 @@
     <div x-show="showBulk" x-cloak
          class="bg-white rounded-xl shadow-sm border border-indigo-100 p-6">
         <h2 class="text-base font-semibold text-gray-800 mb-1">Bulk yuklash</h2>
-        <p class="text-sm text-gray-500 mb-4">
-          Har bir qatorda: <code class="bg-gray-100 px-1 rounded font-mono text-xs">login|parol</code>
-          yoki faqat invite link: <code class="bg-gray-100 px-1 rounded font-mono text-xs">https://t.me/joinchat/...</code>
+        <p class="text-sm text-gray-500 mb-1">
+          Har bir qatorda maydonlar <code class="bg-gray-100 px-1 rounded font-mono text-xs">|</code> bilan ajratiladi:
+        </p>
+        <p class="text-xs text-gray-400 mb-4">
+          Masalan: <code class="bg-gray-100 px-1 rounded font-mono text-xs" x-text="bulkFields.join('|')"></code>
         </p>
         <form method="POST" action="/accounts/bulk" class="space-y-4">
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                    <label class="label" for="bulk_product_id">Mahsulot <span class="text-red-500">*</span></label>
-                    <select id="bulk_product_id" name="product_id" required class="input-field">
+                    <label class="label">Mahsulot <span class="text-red-500">*</span></label>
+                    <select name="product_id" required class="input-field"
+                            @change="loadBulkFields($event.target.value)">
                         <option value="">Tanlang</option>
                         {% for p in products %}
                         <option value="{{ p.id }}">{{ p.name_uz }}</option>
@@ -90,15 +119,15 @@
                     </select>
                 </div>
                 <div>
-                    <label class="label" for="bulk_supplier">Supplier</label>
-                    <input id="bulk_supplier" name="supplier" type="text" class="input-field" placeholder="manba">
+                    <label class="label">Supplier</label>
+                    <input name="supplier" type="text" class="input-field" placeholder="manba">
                 </div>
             </div>
             <div>
-                <label class="label" for="bulk_accounts">Akkauntlar (har qatorda bitta)</label>
-                <textarea id="bulk_accounts" name="lines_text" rows="6" required
+                <label class="label">Akkauntlar (har qatorda bitta)</label>
+                <textarea name="lines_text" rows="6" required
                           class="input-field font-mono resize-y"
-                          placeholder="user@gmail.com|parol123&#10;user2@gmail.com|parol456&#10;https://t.me/joinchat/abc123"></textarea>
+                          :placeholder="'Misol: ' + bulkFields.join('|')"></textarea>
             </div>
             <div class="flex justify-end gap-2">
                 <button type="button" @click="showBulk = false" class="btn-secondary">Bekor qilish</button>
@@ -111,8 +140,8 @@
     <form method="GET" action="/accounts" class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <div class="flex flex-wrap items-end gap-3">
             <div class="flex-1 min-w-40">
-                <label class="label" for="filter_product">Obuna turi</label>
-                <select id="filter_product" name="product_id" class="input-field">
+                <label class="label">Obuna turi</label>
+                <select name="product_id" class="input-field">
                     <option value="">Barchasi</option>
                     {% for p in products %}
                     <option value="{{ p.id }}" {% if filter_product_id and filter_product_id|string == p.id|string %}selected{% endif %}>
@@ -122,8 +151,8 @@
                 </select>
             </div>
             <div class="flex-1 min-w-32">
-                <label class="label" for="filter_status">Status</label>
-                <select id="filter_status" name="status" class="input-field">
+                <label class="label">Status</label>
+                <select name="status" class="input-field">
                     <option value="">Barchasi</option>
                     <option value="available" {% if filter_status == 'available' %}selected{% endif %}>Bo'sh</option>
                     <option value="reserved" {% if filter_status == 'reserved' %}selected{% endif %}>Band</option>
@@ -136,17 +165,17 @@
         </div>
     </form>
 
-    <!-- Table -->
+    <!-- Table (desktop) / Cards (mobile) -->
     <div class="table-container">
         {% if accounts %}
-        <div class="overflow-x-auto">
+        <!-- Desktop table -->
+        <div class="overflow-x-auto hidden md:block">
             <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b border-gray-100 bg-gray-50">
                         <th class="text-left px-4 py-3 font-medium text-gray-500">#</th>
                         <th class="text-left px-4 py-3 font-medium text-gray-500">Obuna turi</th>
-                        <th class="text-left px-4 py-3 font-medium text-gray-500">Login</th>
-                        <th class="text-left px-4 py-3 font-medium text-gray-500">Parol</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Maydonlar</th>
                         <th class="text-left px-4 py-3 font-medium text-gray-500">Muddat</th>
                         <th class="text-center px-4 py-3 font-medium text-gray-500">Qolgan kun</th>
                         <th class="text-center px-4 py-3 font-medium text-gray-500">Status</th>
@@ -160,13 +189,20 @@
                     <tr class="hover:bg-gray-50 transition-colors even:bg-gray-50/50">
                         <td class="px-4 py-3 text-gray-400">{{ loop.index }}</td>
                         <td class="px-4 py-3 font-medium text-gray-800">{{ acc.product_name or '—' }}</td>
-                        <td class="px-4 py-3 font-mono text-xs text-gray-700">{{ acc.login }}</td>
-                        <td class="px-4 py-3 font-mono text-xs text-gray-400">****</td>
-                        <td class="px-4 py-3 text-gray-500 text-xs">{{ acc.expires_at or '—' }}</td>
+                        <td class="px-4 py-3 font-mono text-xs text-gray-700">
+                            {% if acc.fields %}
+                                {% for k, v in acc.fields.items() %}
+                                <div><span class="text-gray-400">{{ k }}:</span> {{ v or '—' }}</div>
+                                {% endfor %}
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-gray-500 text-xs">{{ acc.expiry_date or '—' }}</td>
                         <td class="px-4 py-3 text-center">
-                            {% if acc.days_left is defined and acc.days_left is not none %}
-                            <span class="{{ 'text-green-600' if acc.days_left > 7 else ('text-amber-600' if acc.days_left > 0 else 'text-red-500') }} font-medium">
-                                {{ acc.days_left }}
+                            {% if acc.remaining_days is defined and acc.remaining_days is not none %}
+                            <span class="{{ 'text-green-600' if acc.remaining_days > 7 else ('text-amber-600' if acc.remaining_days > 0 else 'text-red-500') }} font-medium">
+                                {{ acc.remaining_days }}
                             </span>
                             {% else %}
                             <span class="text-gray-400">—</span>
@@ -174,20 +210,20 @@
                         </td>
                         <td class="px-4 py-3 text-center">
                             {% if acc.status == 'available' %}
-                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Bo'sh</span>
+                            <span class="badge badge-green">Bo'sh</span>
                             {% elif acc.status == 'reserved' %}
-                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Band</span>
+                            <span class="badge badge-yellow">Band</span>
                             {% elif acc.status == 'sold' %}
-                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Sotilgan</span>
+                            <span class="badge badge-gray">Sotilgan</span>
                             {% elif acc.status == 'expired' %}
-                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Muddati o'tgan</span>
+                            <span class="badge badge-red">Muddati o'tgan</span>
                             {% else %}
-                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">{{ acc.status }}</span>
+                            <span class="badge badge-gray">{{ acc.status }}</span>
                             {% endif %}
                         </td>
                         <td class="px-4 py-3 text-gray-500 text-xs">{{ acc.supplier or '—' }}</td>
                         <td class="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
-                            {{ acc.created_at.strftime('%d.%m.%Y') if acc.created_at else '—' }}
+                            {{ acc.created_at[:10] if acc.created_at else '—' }}
                         </td>
                         <td class="px-4 py-3 text-center">
                             <form method="POST" action="/accounts/{{ acc.id }}/delete" class="inline"
@@ -199,6 +235,43 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+        <!-- Mobile cards -->
+        <div class="md:hidden divide-y divide-gray-100">
+            {% for acc in accounts %}
+            <div class="p-4 space-y-2">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="font-medium text-gray-800 text-sm">{{ acc.product_name or '—' }}</div>
+                    {% if acc.status == 'available' %}
+                    <span class="badge badge-green">Bo'sh</span>
+                    {% elif acc.status == 'reserved' %}
+                    <span class="badge badge-yellow">Band</span>
+                    {% elif acc.status == 'sold' %}
+                    <span class="badge badge-gray">Sotilgan</span>
+                    {% else %}
+                    <span class="badge badge-red">{{ acc.status }}</span>
+                    {% endif %}
+                </div>
+                {% if acc.fields %}
+                <div class="text-xs font-mono text-gray-700 space-y-0.5">
+                    {% for k, v in acc.fields.items() %}
+                    <div><span class="text-gray-400">{{ k }}:</span> {{ v or '—' }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <div class="text-xs text-gray-400 flex flex-wrap gap-3">
+                    <span>Muddat: {{ acc.expiry_date or '—' }}</span>
+                    {% if acc.supplier %}<span>Supplier: {{ acc.supplier }}</span>{% endif %}
+                    <span>{{ acc.created_at[:10] if acc.created_at else '—' }}</span>
+                </div>
+                <div class="pt-1">
+                    <form method="POST" action="/accounts/{{ acc.id }}/delete" class="inline"
+                          onsubmit="return confirm('Akkauntni o\'chirishni tasdiqlaysizmi?')">
+                        <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium">O'chirish</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
         </div>
         {% else %}
         <div class="flex flex-col items-center justify-center py-16 text-center">

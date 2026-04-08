@@ -485,6 +485,20 @@ async def init_db() -> None:
             ('bot_language_mode', 'uz_ru', 'Til rejimi (uz / uz_ru)', 'Режим языка', 'general', 'text'),
         ]
 
+        # PHASE 4: auto-confirm settings
+        defaults.extend([
+            ('auto_confirm_enabled', '0', 'Avtomatik tasdiqlash', 'Авто подтверждение', 'payment', 'toggle'),
+            ('auto_confirm_limit', '50000', "Avtomatik tasdiqlash limiti (so'm)", 'Лимит авто подтверждения', 'payment', 'number'),
+        ])
+        # PHASE 5: payment API keys
+        defaults.extend([
+            ('payme_merchant_id', '', 'Payme Merchant ID', 'Payme Merchant ID', 'payment', 'text'),
+            ('payme_secret_key', '', 'Payme Secret Key', 'Payme Secret Key', 'payment', 'text'),
+            ('click_merchant_id', '', 'Click Merchant ID', 'Click Merchant ID', 'payment', 'text'),
+            ('click_secret_key', '', 'Click Secret Key', 'Click Secret Key', 'payment', 'text'),
+            ('click_service_id', '', 'Click Service ID', 'Click Service ID', 'payment', 'text'),
+        ])
+
         for d in defaults:
             try:
                 await db.execute(
@@ -516,6 +530,16 @@ async def init_db() -> None:
             ("cart_items", "reminder_sent_2h", "INTEGER DEFAULT 0"),
             ("cart_items", "reminder_sent_24h", "INTEGER DEFAULT 0"),
         ]
+
+        # PHASE 2: flexible account fields
+        migrations.extend([
+            ("products", "account_fields", "TEXT DEFAULT '[\"Login\", \"Parol\"]'"),
+            ("accounts", "fields_json", "TEXT"),
+        ])
+        # PHASE 4: auto-confirmation
+        migrations.extend([
+            ("orders", "payment_method", "TEXT"),
+        ])
 
         for table, col, coltype in migrations:
             try:

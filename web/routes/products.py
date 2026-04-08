@@ -1,11 +1,12 @@
 """
 Mahsulotlar CRUD — 2-daraja: Mahsulotlar → Akkauntlar
 """
+import json
 import logging
 import os
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from bot.db.database import get_db
@@ -66,6 +67,33 @@ async def products_add_form(request: Request):
     })
 
 
+@router.get("/{product_id}/fields")
+async def product_fields(request: Request, product_id: int):
+    """Mahsulotning account_fields ro'yxatini JSON da qaytaradi."""
+    redirect = require_auth(request)
+    if redirect:
+        return redirect
+    try:
+        async with get_db() as db:
+            cursor = await db.execute(
+                "SELECT account_fields FROM products WHERE id = ?", (product_id,)
+            )
+            row = await cursor.fetchone()
+        if not row:
+            return JSONResponse({"fields": ["Login", "Parol"]})
+        raw = row["account_fields"] or '["Login", "Parol"]'
+        try:
+            fields = json.loads(raw)
+            if not isinstance(fields, list):
+                fields = ["Login", "Parol"]
+        except Exception:
+            fields = ["Login", "Parol"]
+        return JSONResponse({"fields": fields})
+    except Exception:
+        logger.exception("account_fields olishda xato")
+        return JSONResponse({"fields": ["Login", "Parol"]})
+
+
 @router.post("/add")
 async def products_add_submit(
     request: Request,
@@ -82,10 +110,20 @@ async def products_add_submit(
     video_url: str = Form(""),
     image_url: str = Form(""),
     is_active: str = Form("1"),
+    account_fields_json: str = Form('["Login", "Parol"]'),
 ):
     redirect = require_auth(request)
     if redirect:
         return redirect
+
+    # Validate account_fields_json
+    try:
+        fields_list = json.loads(account_fields_json)
+        if not isinstance(fields_list, list) or not fields_list:
+            fields_list = ["Login", "Parol"]
+    except Exception:
+        fields_list = ["Login", "Parol"]
+    account_fields_str = json.dumps(fields_list, ensure_ascii=False)
 
     try:
         async with get_db() as db:
@@ -94,8 +132,8 @@ async def products_add_submit(
                     (name_uz, name_ru, price, cost_price,
                      description_uz, description_ru,
                      has_warranty, warranty_days, video_keyword,
-                     duration_days, video_url, image_url, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     duration_days, video_url, image_url, is_active, account_fields)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 name_uz.strip(), name_ru.strip() or None,
                 price, cost_price,
@@ -106,6 +144,7 @@ async def products_add_submit(
                 video_url.strip() or None,
                 image_url.strip() or None,
                 1 if is_active in ("1", "on") else 0,
+                account_fields_str,
             ))
             await db.commit()
 
@@ -160,10 +199,19 @@ async def products_edit_submit(
     video_url: str = Form(""),
     image_url: str = Form(""),
     is_active: str = Form("1"),
+    account_fields_json: str = Form('["Login", "Parol"]'),
 ):
     redirect = require_auth(request)
     if redirect:
         return redirect
+
+    try:
+        fields_list = json.loads(account_fields_json)
+        if not isinstance(fields_list, list) or not fields_list:
+            fields_list = ["Login", "Parol"]
+    except Exception:
+        fields_list = ["Login", "Parol"]
+    account_fields_str = json.dumps(fields_list, ensure_ascii=False)
 
     try:
         async with get_db() as db:
@@ -173,7 +221,8 @@ async def products_edit_submit(
                     description_uz = ?, description_ru = ?,
                     has_warranty = ?, warranty_days = ?,
                     video_keyword = ?, duration_days = ?,
-                    video_url = ?, image_url = ?, is_active = ?
+                    video_url = ?, image_url = ?, is_active = ?,
+                    account_fields = ?
                 WHERE id = ?
             """, (
                 name_uz.strip(), name_ru.strip() or None,
@@ -185,6 +234,7 @@ async def products_edit_submit(
                 video_url.strip() or None,
                 image_url.strip() or None,
                 1 if is_active in ("1", "on") else 0,
+                account_fields_str,
                 product_id,
             ))
             await db.commit()

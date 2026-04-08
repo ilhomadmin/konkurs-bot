@@ -282,7 +282,7 @@ async def get_order_items(order_id: int) -> list[dict]:
                    p.instruction_video_file_id,
                    p.category_id,
                    a.login, a.password, a.expiry_date as account_expiry,
-                   a.additional_data,
+                   a.additional_data, a.fields_json,
                    c.instruction_video_file_id as category_video
             FROM order_items oi
             JOIN products p ON p.id = oi.product_id
