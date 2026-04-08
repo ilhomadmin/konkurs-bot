@@ -205,20 +205,24 @@ async def create_product(name_uz: str, name_ru: str, price: int, cost_price: int
 
 async def get_all_products(only_active: bool = False) -> list[dict]:
     async with get_db() as db:
-        q = "SELECT * FROM products"
+        q = """SELECT p.*,
+               (SELECT COUNT(*) FROM accounts a WHERE a.product_id = p.id AND a.status = 'available') AS stock
+               FROM products p"""
         if only_active:
-            q += " WHERE is_active = 1"
-        q += " ORDER BY sort_order, id"
+            q += " WHERE p.is_active = 1"
+        q += " ORDER BY p.sort_order, p.id"
         cursor = await db.execute(q)
         return [dict(r) for r in await cursor.fetchall()]
 
 
 async def get_products_by_category(category_id: int, only_active: bool = False) -> list[dict]:
     async with get_db() as db:
-        q = "SELECT * FROM products WHERE category_id = ?"
+        q = """SELECT p.*,
+               (SELECT COUNT(*) FROM accounts a WHERE a.product_id = p.id AND a.status = 'available') AS stock
+               FROM products p WHERE p.category_id = ?"""
         if only_active:
-            q += " AND is_active = 1"
-        q += " ORDER BY sort_order, id"
+            q += " AND p.is_active = 1"
+        q += " ORDER BY p.sort_order, p.id"
         cursor = await db.execute(q, (category_id,))
         return [dict(r) for r in await cursor.fetchall()]
 
@@ -457,6 +461,8 @@ async def update_remaining_days() -> int:
         cursor = await db.execute("SELECT id, expiry_date FROM accounts WHERE status = 'available'")
         rows = await cursor.fetchall()
         for row in rows:
+            if not row["expiry_date"]:
+                continue
             exp = date.fromisoformat(row["expiry_date"])
             remaining = (exp - today).days
             if remaining <= 0:

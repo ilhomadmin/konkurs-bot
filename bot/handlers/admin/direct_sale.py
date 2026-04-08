@@ -249,7 +249,7 @@ async def direct_sale_start(message: Message, command: CommandObject, bot: Bot) 
 
         # Order yaratish
         order_id = await create_order(
-            telegram_id=tg_user.id,
+            user_telegram_id=tg_user.id,
             total_amount=unit_price,
             discount_amount=0
         )

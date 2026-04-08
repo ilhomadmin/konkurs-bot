@@ -28,6 +28,8 @@ async def direct_sale_form(request: Request):
 
     admin = get_current_admin(request)
     product_id = request.query_params.get("product_id", "")
+    raw_token = request.query_params.get("success_token", "")
+    success_token = raw_token if raw_token else None
 
     try:
         async with get_db() as db:
@@ -41,7 +43,7 @@ async def direct_sale_form(request: Request):
                 cursor2 = await db.execute("""
                     SELECT a.*, p.name_uz AS product_name
                     FROM accounts a
-                    JOIN products p ON p.id = a.product_id
+                    LEFT JOIN products p ON p.id = a.product_id
                     WHERE a.product_id = ? AND a.status = 'available'
                     ORDER BY a.expiry_date ASC
                     LIMIT 1
@@ -53,19 +55,20 @@ async def direct_sale_form(request: Request):
             cursor3 = await db.execute("""
                 SELECT a.*, p.name_uz AS product_name
                 FROM accounts a
-                JOIN products p ON p.id = a.product_id
+                LEFT JOIN products p ON p.id = a.product_id
                 WHERE a.direct_sale_token IS NOT NULL AND a.status = 'available'
                 ORDER BY a.created_at DESC
                 LIMIT 50
             """)
-            direct_links = [dict(r) for r in await cursor3.fetchall()]
+            accounts_list = [dict(r) for r in await cursor3.fetchall()]
 
         return templates.TemplateResponse(request, "direct_sale.html", {
             "admin": admin,
             "products": products,
             "available_account": available_account,
-            "direct_links": direct_links,
+            "accounts_list": accounts_list,
             "selected_product_id": product_id,
+            "success_token": success_token,
         })
     except Exception:
         logger.exception("To'g'ridan-to'g'ri sotuv formasini yuklashda xato")
@@ -73,8 +76,9 @@ async def direct_sale_form(request: Request):
             "admin": admin,
             "products": [],
             "available_account": None,
-            "direct_links": [],
+            "accounts_list": [],
             "selected_product_id": "",
+            "success_token": None,
             "error": "Xato yuz berdi",
         })
 
@@ -122,7 +126,7 @@ async def direct_sale_generate(
             await db.commit()
 
         return RedirectResponse(
-            f"/direct-sale?success=generated&token={token}&product_id={product_id}",
+            f"/direct-sale?success_token=DS_{token}&product_id={product_id}",
             status_code=302,
         )
     except Exception:

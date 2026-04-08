@@ -71,7 +71,7 @@ async def create_order_handler(
 
         # Buyurtma yaratish
         order_id = await create_order(
-            telegram_id=user_telegram_id,
+            user_telegram_id=user_telegram_id,
             total_amount=final_amount,
             discount_amount=discount_amount,
             promo_code_id=promo_id

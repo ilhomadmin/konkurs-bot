@@ -170,7 +170,7 @@ async def confirm_payment(callback: CallbackQuery, bot: Bot) -> None:
             await callback.answer(t("not_found"), show_alert=True)
             return
 
-        user_telegram_id = order["telegram_id"]
+        user_telegram_id = order["user_telegram_id"]
         user = await get_user(user_telegram_id)
         lang = user.get("language", "uz") if user else "uz"
 
@@ -255,7 +255,7 @@ async def reject_payment(callback: CallbackQuery, bot: Bot) -> None:
             await callback.answer(t("not_found"), show_alert=True)
             return
 
-        user_telegram_id = order["telegram_id"]
+        user_telegram_id = order["user_telegram_id"]
         user = await get_user(user_telegram_id)
         lang = user.get("language", "uz") if user else "uz"
 
@@ -338,7 +338,7 @@ async def partial_item_ok(callback: CallbackQuery, bot: Bot) -> None:
             await callback.answer(t("not_found"), show_alert=True)
             return
 
-        user_telegram_id = order["telegram_id"]
+        user_telegram_id = order["user_telegram_id"]
         user = await get_user(user_telegram_id)
         lang = user.get("language", "uz") if user else "uz"
 

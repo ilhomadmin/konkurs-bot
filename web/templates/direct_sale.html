@@ -141,44 +141,51 @@
     </div>
 
     <!-- Generated link -->
-    {% if link %}
+    {% if success_token %}
     <div class="bg-white rounded-xl shadow-sm border border-indigo-100 p-6">
         <h2 class="text-base font-semibold text-gray-800 mb-3">Yaratilgan havola</h2>
         <div class="flex items-center gap-2">
-            <input type="text" readonly value="{{ link }}" id="payment_link"
+            <input type="text" readonly value="https://t.me/aaarzonbot?start={{ success_token }}" id="ds_token_link"
                    class="input-field font-mono text-xs bg-gray-50 flex-1">
-            <button type="button" onclick="copyLink()" class="btn-secondary text-xs whitespace-nowrap">Nusxalash</button>
+            <button type="button" id="ds_copy_btn"
+                    onclick="navigator.clipboard.writeText(document.getElementById('ds_token_link').value).then(()=>{var b=document.getElementById('ds_copy_btn');var t=b.textContent;b.textContent='Nusxalandi!';b.classList.add('bg-green-50','text-green-700','border-green-200');setTimeout(()=>{b.textContent=t;b.classList.remove('bg-green-50','text-green-700','border-green-200')},2000);})"
+                    class="btn-secondary text-xs whitespace-nowrap">Nusxalash</button>
         </div>
         <p class="text-xs text-indigo-500 mt-2">Ushbu havolani mijozga yuboring.</p>
     </div>
     {% endif %}
 
-    <!-- Recent direct sales -->
+    <!-- Active direct sale tokens -->
     <div class="table-container">
         <div class="px-5 py-4 border-b border-gray-100">
-            <h3 class="text-sm font-semibold text-gray-900">Oxirgi direct sotuvlar</h3>
+            <h3 class="text-sm font-semibold text-gray-900">Faol direct sale havolalar</h3>
         </div>
-        {% if recent_sales %}
+        {% if accounts_list %}
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b border-gray-100 bg-gray-50">
                         <th class="text-left px-4 py-3 font-medium text-gray-500">#</th>
                         <th class="text-left px-4 py-3 font-medium text-gray-500">Mahsulot</th>
-                        <th class="text-left px-4 py-3 font-medium text-gray-500">Mijoz</th>
                         <th class="text-left px-4 py-3 font-medium text-gray-500">Akkaunt</th>
-                        <th class="text-left px-4 py-3 font-medium text-gray-500">Sana</th>
+                        <th class="text-left px-4 py-3 font-medium text-gray-500">Token havolasi</th>
+                        <th class="text-center px-4 py-3 font-medium text-gray-500">Amallar</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-50">
-                    {% for sale in recent_sales %}
+                    {% for acc in accounts_list %}
                     <tr class="even:bg-gray-50/50 hover:bg-gray-50 transition-colors">
                         <td class="px-4 py-3 text-gray-400">{{ loop.index }}</td>
-                        <td class="px-4 py-3 font-medium text-gray-800">{{ sale.product_name or '—' }}</td>
-                        <td class="px-4 py-3 text-gray-600">{{ sale.buyer_name or sale.telegram_id or '—' }}</td>
-                        <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ sale.login or '—' }}</td>
-                        <td class="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
-                            {{ sale.created_at.strftime('%d.%m.%Y %H:%M') if sale.created_at else '—' }}
+                        <td class="px-4 py-3 font-medium text-gray-800">{{ acc.product_name or '—' }}</td>
+                        <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ acc.login or acc.additional_data or '—' }}</td>
+                        <td class="px-4 py-3 font-mono text-xs text-indigo-600 max-w-xs truncate">
+                            https://t.me/aaarzonbot?start=DS_{{ acc.direct_sale_token }}
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <form method="POST" action="/direct-sale/revoke" class="inline">
+                                <input type="hidden" name="account_id" value="{{ acc.id }}">
+                                <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium">Bekor qilish</button>
+                            </form>
                         </td>
                     </tr>
                     {% endfor %}
@@ -187,31 +194,11 @@
         </div>
         {% else %}
         <div class="flex flex-col items-center justify-center py-10 text-center">
-            <p class="text-gray-400 text-sm">Hozircha direct sotuvlar yo'q</p>
+            <p class="text-gray-400 text-sm">Faol direct sale havolalar yo'q</p>
         </div>
         {% endif %}
     </div>
 </div>
 {% endblock %}
 
-{% block scripts %}
-{% if link %}
-<script>
-function copyLink() {
-    const el = document.getElementById('payment_link');
-    el.select();
-    el.setSelectionRange(0, 99999);
-    navigator.clipboard.writeText(el.value).then(() => {
-        const btn = el.nextElementSibling;
-        const original = btn.textContent;
-        btn.textContent = 'Nusxalandi!';
-        btn.classList.add('bg-green-50', 'text-green-700', 'border-green-200');
-        setTimeout(() => {
-            btn.textContent = original;
-            btn.classList.remove('bg-green-50', 'text-green-700', 'border-green-200');
-        }, 2000);
-    });
-}
-</script>
-{% endif %}
-{% endblock %}
+{% block scripts %}{% endblock %}

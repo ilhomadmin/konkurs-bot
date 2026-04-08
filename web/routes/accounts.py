@@ -47,7 +47,7 @@ async def accounts_list(request: Request):
             cursor = await db.execute(f"""
                 SELECT a.*, p.name_uz AS product_name
                 FROM accounts a
-                JOIN products p ON p.id = a.product_id
+                LEFT JOIN products p ON p.id = a.product_id
                 {where}
                 ORDER BY a.created_at DESC
                 LIMIT 200
@@ -129,7 +129,7 @@ async def accounts_add(
 async def accounts_bulk_add(
     request: Request,
     product_id: int = Form(...),
-    accounts: str = Form(...),
+    lines_text: str = Form(...),
     supplier: str = Form(""),
     next: str = Form(""),
 ):
@@ -146,7 +146,7 @@ async def accounts_bulk_add(
             row = await cursor.fetchone()
             duration_days = row["duration_days"] if row and row["duration_days"] else 30
 
-        lines = [l for l in accounts.splitlines() if l.strip()]
+        lines = [l for l in lines_text.splitlines() if l.strip()]
         result = await bulk_create_accounts(
             product_id=product_id, lines=lines, duration_days=duration_days
         )
@@ -189,7 +189,7 @@ async def accounts_export(request: Request):
                 SELECT a.id, p.name_uz AS product_name, a.login, a.password,
                        a.expiry_date, a.remaining_days, a.status, a.supplier, a.created_at
                 FROM accounts a
-                JOIN products p ON p.id = a.product_id
+                LEFT JOIN products p ON p.id = a.product_id
                 {where}
                 ORDER BY a.created_at DESC
             """, params)
