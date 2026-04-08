@@ -115,16 +115,16 @@ async def init_db() -> None:
         """)
 
         # ==================== AKKAUNTLAR ====================
-        # duration_tier endi kerak emas, lekin qoladi (migration)
+        # login, password, expiry_date — nullable (flexible fields)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS accounts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 product_id INTEGER NOT NULL,
-                login TEXT NOT NULL,
-                password TEXT NOT NULL,
+                login TEXT,
+                password TEXT,
                 additional_data TEXT,
                 supplier TEXT,
-                expiry_date DATE NOT NULL,
+                expiry_date DATE,
                 remaining_days INTEGER,
                 duration_tier TEXT,
                 status TEXT DEFAULT 'available',
@@ -503,6 +503,10 @@ async def init_db() -> None:
             ("products", "duration_text_uz", "TEXT"),
             ("products", "duration_text_ru", "TEXT"),
             ("products", "video_keyword", "TEXT"),
+            # FIX 1: yangi product ustunlar
+            ("products", "duration_days", "INTEGER DEFAULT 30"),
+            ("products", "video_url", "TEXT"),
+            ("products", "image_url", "TEXT"),
             ("categories", "video_keyword", "TEXT"),
             ("admin_roles", "password_hash", "TEXT"),
             ("admin_roles", "permissions", "TEXT"),
@@ -518,6 +522,54 @@ async def init_db() -> None:
                 await db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {coltype}")
             except Exception:
                 pass  # Allaqachon mavjud
+
+        # FIX 7: accounts jadvalida expiry_date / login / password NOT NULL bo'lsa qayta yaratish
+        try:
+            cursor = await db.execute("PRAGMA table_info(accounts)")
+            cols = await cursor.fetchall()
+            needs_recreation = any(
+                col[1] in ("expiry_date", "login", "password") and col[3] == 1
+                for col in cols
+            )
+            if needs_recreation:
+                logger.info("accounts jadvalini nullable ustunlar bilan qayta yaratish...")
+                await db.execute("PRAGMA foreign_keys = OFF")
+                await db.execute("""
+                    CREATE TABLE IF NOT EXISTS accounts_v2 (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        product_id INTEGER NOT NULL,
+                        login TEXT,
+                        password TEXT,
+                        additional_data TEXT,
+                        supplier TEXT,
+                        expiry_date DATE,
+                        remaining_days INTEGER,
+                        duration_tier TEXT,
+                        status TEXT DEFAULT 'available',
+                        reserved_for_order_id INTEGER,
+                        reserved_at TIMESTAMP,
+                        sold_to_user_id INTEGER,
+                        sold_at TIMESTAMP,
+                        sold_via TEXT,
+                        direct_sale_token TEXT UNIQUE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+                    )
+                """)
+                await db.execute("""
+                    INSERT OR IGNORE INTO accounts_v2
+                    SELECT id, product_id, login, password, additional_data, supplier,
+                           expiry_date, remaining_days, duration_tier, status,
+                           reserved_for_order_id, reserved_at, sold_to_user_id, sold_at,
+                           sold_via, direct_sale_token, created_at
+                    FROM accounts
+                """)
+                await db.execute("DROP TABLE accounts")
+                await db.execute("ALTER TABLE accounts_v2 RENAME TO accounts")
+                await db.execute("PRAGMA foreign_keys = ON")
+                logger.info("accounts jadval migratsiyasi muvaffaqiyatli.")
+        except Exception as e:
+            logger.warning(f"accounts migration error: {e}")
 
         await db.commit()
         logger.info("DB init completed.")

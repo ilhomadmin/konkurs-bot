@@ -78,6 +78,9 @@ async def products_add_submit(
     has_warranty: str = Form("0"),
     warranty_days: int = Form(0),
     video_keyword: str = Form(""),
+    duration_days: int = Form(30),
+    video_url: str = Form(""),
+    image_url: str = Form(""),
     is_active: str = Form("1"),
 ):
     redirect = require_auth(request)
@@ -90,14 +93,18 @@ async def products_add_submit(
                 INSERT INTO products
                     (name_uz, name_ru, price, cost_price,
                      description_uz, description_ru,
-                     has_warranty, warranty_days, video_keyword, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     has_warranty, warranty_days, video_keyword,
+                     duration_days, video_url, image_url, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 name_uz.strip(), name_ru.strip() or None,
                 price, cost_price,
                 description_uz.strip() or None, description_ru.strip() or None,
                 1 if has_warranty in ("1", "on") else 0, warranty_days,
                 video_keyword.strip() or None,
+                duration_days or 30,
+                video_url.strip() or None,
+                image_url.strip() or None,
                 1 if is_active in ("1", "on") else 0,
             ))
             await db.commit()
@@ -149,6 +156,9 @@ async def products_edit_submit(
     has_warranty: str = Form("0"),
     warranty_days: int = Form(0),
     video_keyword: str = Form(""),
+    duration_days: int = Form(30),
+    video_url: str = Form(""),
+    image_url: str = Form(""),
     is_active: str = Form("1"),
 ):
     redirect = require_auth(request)
@@ -162,7 +172,8 @@ async def products_edit_submit(
                 SET name_uz = ?, name_ru = ?, price = ?, cost_price = ?,
                     description_uz = ?, description_ru = ?,
                     has_warranty = ?, warranty_days = ?,
-                    video_keyword = ?, is_active = ?
+                    video_keyword = ?, duration_days = ?,
+                    video_url = ?, image_url = ?, is_active = ?
                 WHERE id = ?
             """, (
                 name_uz.strip(), name_ru.strip() or None,
@@ -170,6 +181,9 @@ async def products_edit_submit(
                 description_uz.strip() or None, description_ru.strip() or None,
                 1 if has_warranty in ("1", "on") else 0, warranty_days,
                 video_keyword.strip() or None,
+                duration_days or 30,
+                video_url.strip() or None,
+                image_url.strip() or None,
                 1 if is_active in ("1", "on") else 0,
                 product_id,
             ))

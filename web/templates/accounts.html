@@ -35,10 +35,11 @@
     <!-- Inline: Add single account -->
     <div x-show="showAddSingle" x-cloak
          class="bg-white rounded-xl shadow-sm border border-indigo-100 p-6">
-        <h2 class="text-base font-semibold text-gray-800 mb-4">Bitta akkaunt qo'shish</h2>
-        <form method="POST" action="/accounts/add" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <h2 class="text-base font-semibold text-gray-800 mb-1">Bitta akkaunt qo'shish</h2>
+        <p class="text-xs text-gray-400 mb-4">Login, parol yoki invite link — kamida bittasi to'ldirilishi shart</p>
+        <form method="POST" action="/accounts/add" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
-                <label class="label" for="add_product_id">Obuna turi <span class="text-red-500">*</span></label>
+                <label class="label" for="add_product_id">Mahsulot <span class="text-red-500">*</span></label>
                 <select id="add_product_id" name="product_id" required class="input-field">
                     <option value="">Tanlang</option>
                     {% for p in products %}
@@ -47,18 +48,22 @@
                 </select>
             </div>
             <div>
-                <label class="label" for="add_login">Login <span class="text-red-500">*</span></label>
-                <input id="add_login" name="login" type="text" required class="input-field" placeholder="email yoki login">
+                <label class="label" for="add_login">Login</label>
+                <input id="add_login" name="login" type="text" class="input-field" placeholder="email yoki login">
             </div>
             <div>
-                <label class="label" for="add_password">Parol <span class="text-red-500">*</span></label>
-                <input id="add_password" name="password" type="text" required class="input-field" placeholder="parol">
+                <label class="label" for="add_password">Parol</label>
+                <input id="add_password" name="password" type="text" class="input-field" placeholder="parol">
+            </div>
+            <div>
+                <label class="label" for="add_invite_link">Invite Link</label>
+                <input id="add_invite_link" name="invite_link" type="text" class="input-field" placeholder="https://...">
             </div>
             <div>
                 <label class="label" for="add_supplier">Supplier</label>
                 <input id="add_supplier" name="supplier" type="text" class="input-field" placeholder="manba">
             </div>
-            <div class="sm:col-span-2 lg:col-span-4 flex justify-end gap-2">
+            <div class="sm:col-span-2 lg:col-span-5 flex justify-end gap-2">
                 <button type="button" @click="showAddSingle = false" class="btn-secondary">Bekor qilish</button>
                 <button type="submit" class="btn-primary">Qo'shish</button>
             </div>
@@ -69,11 +74,14 @@
     <div x-show="showBulk" x-cloak
          class="bg-white rounded-xl shadow-sm border border-indigo-100 p-6">
         <h2 class="text-base font-semibold text-gray-800 mb-1">Bulk yuklash</h2>
-        <p class="text-sm text-gray-500 mb-4">Har bir qatorda: <code class="bg-gray-100 px-1 rounded font-mono text-xs">login:parol</code> yoki <code class="bg-gray-100 px-1 rounded font-mono text-xs">login parol</code></p>
+        <p class="text-sm text-gray-500 mb-4">
+          Har bir qatorda: <code class="bg-gray-100 px-1 rounded font-mono text-xs">login|parol</code>
+          yoki faqat invite link: <code class="bg-gray-100 px-1 rounded font-mono text-xs">https://t.me/joinchat/...</code>
+        </p>
         <form method="POST" action="/accounts/bulk" class="space-y-4">
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                    <label class="label" for="bulk_product_id">Obuna turi <span class="text-red-500">*</span></label>
+                    <label class="label" for="bulk_product_id">Mahsulot <span class="text-red-500">*</span></label>
                     <select id="bulk_product_id" name="product_id" required class="input-field">
                         <option value="">Tanlang</option>
                         {% for p in products %}
@@ -90,7 +98,7 @@
                 <label class="label" for="bulk_accounts">Akkauntlar (har qatorda bitta)</label>
                 <textarea id="bulk_accounts" name="accounts" rows="6" required
                           class="input-field font-mono resize-y"
-                          placeholder="user@gmail.com:parol123&#10;user2@gmail.com:parol456"></textarea>
+                          placeholder="user@gmail.com|parol123&#10;user2@gmail.com|parol456&#10;https://t.me/joinchat/abc123"></textarea>
             </div>
             <div class="flex justify-end gap-2">
                 <button type="button" @click="showBulk = false" class="btn-secondary">Bekor qilish</button>

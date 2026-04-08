@@ -5,15 +5,12 @@ import csv
 import io
 import logging
 import os
-from datetime import date
-
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
 from bot.db.database import get_db
 from bot.db.models import create_account, bulk_create_accounts
-from bot.utils.duration import days_to_tier
 from web.auth import get_current_admin, require_auth
 
 logger = logging.getLogger(__name__)
@@ -83,22 +80,41 @@ async def accounts_list(request: Request):
 async def accounts_add(
     request: Request,
     product_id: int = Form(...),
-    login: str = Form(...),
-    password: str = Form(...),
-    expiry_date: str = Form(""),
+    login: str = Form(""),
+    password: str = Form(""),
+    invite_link: str = Form(""),
     supplier: str = Form(""),
     next: str = Form(""),
 ):
+    """FIX 2+3: expiry avtomatik, login/password/invite_link ixtiyoriy."""
     redirect = require_auth(request)
     if redirect:
         return redirect
 
+    login = login.strip() or None
+    password = password.strip() or None
+    invite_link = invite_link.strip() or None
+
+    if not login and not password and not invite_link:
+        dest = next.strip() or "/accounts"
+        sep = "&" if "?" in dest else "?"
+        return RedirectResponse(f"{dest}{sep}error=Kamida+bitta+maydon+to%27ldirilishi+kerak", status_code=302)
+
     try:
+        # duration_days mahsulotdan olinadi
+        async with get_db() as db:
+            cursor = await db.execute(
+                "SELECT duration_days FROM products WHERE id = ?", (product_id,)
+            )
+            row = await cursor.fetchone()
+            duration_days = row["duration_days"] if row and row["duration_days"] else 30
+
         await create_account(
             product_id=product_id,
-            login=login.strip(),
-            password=password.strip(),
-            expiry_date=expiry_date.strip() or None,
+            duration_days=duration_days,
+            login=login,
+            password=password,
+            additional_data=invite_link,
             supplier=supplier.strip() or None,
         )
         dest = next.strip() or "/accounts"
@@ -122,8 +138,18 @@ async def accounts_bulk_add(
         return redirect
 
     try:
+        # duration_days mahsulotdan olinadi
+        async with get_db() as db:
+            cursor = await db.execute(
+                "SELECT duration_days FROM products WHERE id = ?", (product_id,)
+            )
+            row = await cursor.fetchone()
+            duration_days = row["duration_days"] if row and row["duration_days"] else 30
+
         lines = [l for l in accounts.splitlines() if l.strip()]
-        result = await bulk_create_accounts(product_id=product_id, lines=lines)
+        result = await bulk_create_accounts(
+            product_id=product_id, lines=lines, duration_days=duration_days
+        )
         added = result.get("added", 0)
         errors = result.get("errors", [])
         dest = next.strip() or "/accounts"

@@ -79,13 +79,40 @@
                  class="input-field" min="1" placeholder="30">
         </div>
 
+        <!-- Muddat kunlari (FIX 1) -->
+        <div>
+          <label class="label">Muddat (kun) <span class="text-xs text-gray-400">— akkaunt amal qilish muddati</span></label>
+          <input type="number" name="duration_days"
+                 value="{{ product.duration_days | default(30) if product else 30 }}"
+                 class="input-field" min="0" placeholder="30">
+          <p class="text-xs text-gray-400 mt-1">0 = cheksiz muddat</p>
+        </div>
+
         <!-- Video keyword -->
         <div>
           <label class="label">Video keyword</label>
           <input type="text" name="video_keyword"
                  value="{{ product.video_keyword | default('') if product else '' }}"
                  class="input-field" placeholder="chatgpt1oy">
-          <p class="text-xs text-gray-400 mt-1">Instruksiya video uchun kalit so'z</p>
+          <p class="text-xs text-gray-400 mt-1">Instruksiya video kalit so'zi</p>
+        </div>
+
+        <!-- Video URL (FIX 1) -->
+        <div>
+          <label class="label">Video URL</label>
+          <input type="url" name="video_url"
+                 value="{{ product.video_url | default('') if product else '' }}"
+                 class="input-field" placeholder="https://youtu.be/...">
+          <p class="text-xs text-gray-400 mt-1">Instruksiya video havolasi</p>
+        </div>
+
+        <!-- Image URL (FIX 1) -->
+        <div>
+          <label class="label">Rasm URL</label>
+          <input type="url" name="image_url"
+                 value="{{ product.image_url | default('') if product else '' }}"
+                 class="input-field" placeholder="https://...">
+          <p class="text-xs text-gray-400 mt-1">Mahsulot rasmi havolasi</p>
         </div>
 
         <!-- Status -->

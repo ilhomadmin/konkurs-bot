@@ -2,7 +2,7 @@
 Users, Categories, Products, Accounts CRUD
 """
 import secrets
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional
 
 from bot.db.database import get_db
@@ -280,52 +280,77 @@ async def get_all_products_flat() -> list[dict]:
 
 # ==================== ACCOUNTS ====================
 
-async def create_account(product_id: int, login: str, password: str, expiry_date: str,
-                         supplier: str = None, additional_data: str = None) -> dict:
+async def create_account(
+    product_id: int,
+    duration_days: int = 30,
+    login: str = None,
+    password: str = None,
+    additional_data: str = None,
+    supplier: str = None,
+) -> dict:
+    """FIX 2: expiry_date avtomatik hisoblanadi duration_days dan."""
     today = date.today()
-    exp = date.fromisoformat(expiry_date)
-    remaining = (exp - today).days
-    status = "available" if remaining > 0 else "expired"
+    if duration_days and duration_days > 0:
+        expiry = today + timedelta(days=duration_days)
+        expiry_str = expiry.isoformat()
+        remaining = duration_days
+        status = "available"
+    else:
+        expiry_str = None
+        remaining = 9999
+        status = "available"
+
     async with get_db() as db:
         cursor = await db.execute("""
             INSERT INTO accounts (product_id, login, password, expiry_date, remaining_days,
                                   supplier, additional_data, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (product_id, login, password, expiry_date, remaining, supplier, additional_data, status))
+        """, (product_id, login or None, password or None, expiry_str, remaining,
+              supplier or None, additional_data or None, status))
         await db.commit()
         return {"id": cursor.lastrowid, "remaining_days": remaining, "status": status}
 
 
-async def bulk_create_accounts(product_id: int, lines: list[str]) -> dict:
+async def bulk_create_accounts(product_id: int, lines: list[str],
+                                duration_days: int = 30) -> dict:
+    """FIX 3: pipe format — login|parol. Bitta qiymat = invite link.
+       FIX 2: expiry_date duration_days dan avtomatik."""
     added = 0
     errors = []
     today = date.today()
+
+    if duration_days and duration_days > 0:
+        expiry_str = (today + timedelta(days=duration_days)).isoformat()
+        remaining = duration_days
+    else:
+        expiry_str = None
+        remaining = 9999
+
     async with get_db() as db:
         for i, line in enumerate(lines, 1):
             line = line.strip()
             if not line:
                 continue
-            parts = line.split(":")
-            if len(parts) < 3:
-                errors.append(f"Qator {i}: noto'g'ri format")
-                continue
-            login = parts[0].strip()
-            pwd = parts[1].strip()
-            expiry_str = parts[2].strip()
-            supplier = parts[3].strip() if len(parts) > 3 else None
-            try:
-                exp = date.fromisoformat(expiry_str)
-            except ValueError:
-                errors.append(f"Qator {i}: noto'g'ri sana — '{expiry_str}'")
-                continue
-            remaining = (exp - today).days
-            status = "available" if remaining > 0 else "expired"
+            login_val = None
+            pwd_val = None
+            invite_val = None
+            if "|" in line:
+                parts = line.split("|", 2)
+                login_val = parts[0].strip() or None
+                pwd_val = parts[1].strip() if len(parts) > 1 else None
+                pwd_val = pwd_val or None
+                invite_val = parts[2].strip() if len(parts) > 2 else None
+                invite_val = invite_val or None
+            else:
+                # Pipe yo'q — invite link deb qabul qilinadi
+                invite_val = line.strip()
             try:
                 await db.execute("""
-                    INSERT INTO accounts (product_id, login, password, expiry_date,
-                                          remaining_days, supplier, status)
+                    INSERT INTO accounts (product_id, login, password, additional_data,
+                                          expiry_date, remaining_days, status)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (product_id, login, pwd, expiry_str, remaining, supplier, status))
+                """, (product_id, login_val, pwd_val, invite_val,
+                      expiry_str, remaining, "available"))
                 added += 1
             except Exception as e:
                 errors.append(f"Qator {i}: DB xato — {e}")
