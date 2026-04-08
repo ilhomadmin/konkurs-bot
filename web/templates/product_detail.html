@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% set active_page = "products" %}
+{% block title %}{{ product.name_uz | default("Mahsulot") }} — IDROK.AI Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="{ showAddSingle: false, showBulk: false }">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <a href="/products" class="text-gray-400 hover:text-gray-600 text-sm">Mahsulotlar</a>
+        <span class="text-gray-300">/</span>
+        <span class="text-sm text-gray-700">{{ product.name_uz | default("") }}</span>
+      </div>
+      <h1 class="text-2xl font-semibold text-gray-900">{{ product.name_uz | default("") }}</h1>
+      {% if product.name_ru | default("") %}
+      <p class="text-sm text-gray-400">{{ product.name_ru }}</p>
+      {% endif %}
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="/products/edit/{{ product.id }}" class="btn-secondary">Tahrirlash</a>
+    </div>
+  </div>
+
+  <!-- Product info cards -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div class="stat-card text-center">
+      <div class="text-2xl font-bold text-green-600">{{ stats.available | default(0) }}</div>
+      <div class="text-xs text-gray-500 mt-1">Mavjud</div>
+    </div>
+    <div class="stat-card text-center">
+      <div class="text-2xl font-bold text-gray-700">{{ stats.total | default(0) }}</div>
+      <div class="text-xs text-gray-500 mt-1">Jami akkaunt</div>
+    </div>
+    <div class="stat-card text-center">
+      <div class="text-2xl font-bold text-indigo-600">{{ "{:,.0f}".format(product.price | default(0) | float) }}</div>
+      <div class="text-xs text-gray-500 mt-1">Narx (so'm)</div>
+    </div>
+    <div class="stat-card text-center">
+      <div class="text-2xl font-bold text-gray-600">{{ stats.sold | default(0) }}</div>
+      <div class="text-xs text-gray-500 mt-1">Sotilgan</div>
+    </div>
+  </div>
+
+  <!-- Product details -->
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5 grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+    <div>
+      <span class="text-gray-400">Tannarx:</span>
+      <span class="font-medium text-gray-700 ml-1">{{ "{:,.0f}".format(product.cost_price | default(0) | float) }} so'm</span>
+    </div>
+    <div>
+      <span class="text-gray-400">Kafolat:</span>
+      {% if product.has_warranty | default(false) %}
+        <span class="badge badge-blue ml-1">{{ product.warranty_days | default(0) }} kun</span>
+      {% else %}
+        <span class="text-gray-500 ml-1">Yo'q</span>
+      {% endif %}
+    </div>
+    <div>
+      <span class="text-gray-400">Status:</span>
+      {% if product.is_active | default(false) %}
+        <span class="badge badge-green ml-1">Faol</span>
+      {% else %}
+        <span class="badge badge-gray ml-1">Nofaol</span>
+      {% endif %}
+    </div>
+    {% if product.video_keyword | default("") %}
+    <div>
+      <span class="text-gray-400">Video:</span>
+      <code class="ml-1 text-xs bg-gray-100 px-1.5 py-0.5 rounded">{{ product.video_keyword }}</code>
+    </div>
+    {% endif %}
+    {% if product.description_uz | default("") %}
+    <div class="col-span-2 sm:col-span-3">
+      <span class="text-gray-400">Tavsif:</span>
+      <span class="text-gray-700 ml-1">{{ product.description_uz }}</span>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Accounts section -->
+  <div class="flex items-center justify-between">
+    <h2 class="text-lg font-semibold text-gray-900">Akkauntlar</h2>
+    <div class="flex items-center gap-2">
+      <button @click="showAddSingle = !showAddSingle; showBulk = false" class="btn-primary btn-sm inline-flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        Qo'shish
+      </button>
+      <button @click="showBulk = !showBulk; showAddSingle = false" class="btn-secondary btn-sm inline-flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        Bulk yuklash
+      </button>
+    </div>
+  </div>
+
+  <!-- Add single -->
+  <div x-show="showAddSingle" x-cloak class="bg-white rounded-xl shadow-sm border border-indigo-100 p-5">
+    <h3 class="text-base font-medium text-gray-800 mb-4">Bitta akkaunt qo'shish</h3>
+    <form method="POST" action="/accounts/add" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <input type="hidden" name="product_id" value="{{ product.id }}">
+      <input type="hidden" name="next" value="/products/{{ product.id }}">
+      <div>
+        <label class="label">Login <span class="text-red-500">*</span></label>
+        <input name="login" type="text" required class="input-field" placeholder="email yoki login">
+      </div>
+      <div>
+        <label class="label">Parol <span class="text-red-500">*</span></label>
+        <input name="password" type="text" required class="input-field" placeholder="parol">
+      </div>
+      <div>
+        <label class="label">Muddat tugash</label>
+        <input name="expiry_date" type="date" class="input-field">
+      </div>
+      <div>
+        <label class="label">Supplier</label>
+        <input name="supplier" type="text" class="input-field" placeholder="manba">
+      </div>
+      <div class="sm:col-span-2 lg:col-span-4 flex justify-end gap-2">
+        <button type="button" @click="showAddSingle = false" class="btn-secondary btn-sm">Bekor</button>
+        <button type="submit" class="btn-primary btn-sm">Qo'shish</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Bulk add -->
+  <div x-show="showBulk" x-cloak class="bg-white rounded-xl shadow-sm border border-indigo-100 p-5">
+    <h3 class="text-base font-medium text-gray-800 mb-1">Bulk yuklash</h3>
+    <p class="text-sm text-gray-500 mb-4">Har bir qatorda: <code class="bg-gray-100 px-1 rounded text-xs">login:parol</code> yoki <code class="bg-gray-100 px-1 rounded text-xs">login parol</code></p>
+    <form method="POST" action="/accounts/bulk" class="space-y-4">
+      <input type="hidden" name="product_id" value="{{ product.id }}">
+      <input type="hidden" name="next" value="/products/{{ product.id }}">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="label">Supplier</label>
+          <input name="supplier" type="text" class="input-field" placeholder="manba">
+        </div>
+      </div>
+      <div>
+        <label class="label">Akkauntlar (har qatorda bitta)</label>
+        <textarea name="accounts" rows="6" required class="input-field font-mono resize-y"
+                  placeholder="user@gmail.com:parol123&#10;user2@gmail.com:parol456"></textarea>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button type="button" @click="showBulk = false" class="btn-secondary btn-sm">Bekor</button>
+        <button type="submit" class="btn-primary btn-sm">Yuklash</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Accounts table -->
+  <div class="table-container">
+    {% if accounts %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-100 bg-gray-50">
+            <th class="text-left px-4 py-3 font-medium text-gray-500">#</th>
+            <th class="text-left px-4 py-3 font-medium text-gray-500">Login</th>
+            <th class="text-left px-4 py-3 font-medium text-gray-500">Parol</th>
+            <th class="text-left px-4 py-3 font-medium text-gray-500">Muddat</th>
+            <th class="text-center px-4 py-3 font-medium text-gray-500">Qolgan kun</th>
+            <th class="text-center px-4 py-3 font-medium text-gray-500">Status</th>
+            <th class="text-left px-4 py-3 font-medium text-gray-500">Supplier</th>
+            <th class="text-center px-4 py-3 font-medium text-gray-500">Amallar</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          {% for acc in accounts %}
+          <tr class="hover:bg-gray-50 transition-colors even:bg-gray-50/40">
+            <td class="px-4 py-3 text-gray-400">{{ loop.index }}</td>
+            <td class="px-4 py-3 font-mono text-xs text-gray-700">{{ acc.login | default("") }}</td>
+            <td class="px-4 py-3 font-mono text-xs text-gray-400" x-data="{ show: false }">
+              <span x-show="!show">••••••</span>
+              <span x-show="show" x-cloak>{{ acc.password | default("") }}</span>
+              <button @click="show = !show" class="ml-1 text-indigo-400 hover:text-indigo-600 text-xs">👁</button>
+            </td>
+            <td class="px-4 py-3 text-gray-500 text-xs">{{ acc.expiry_date | default("—") }}</td>
+            <td class="px-4 py-3 text-center">
+              {% if acc.days_left is not none %}
+                <span class="font-medium {% if acc.days_left > 7 %}text-green-600{% elif acc.days_left > 0 %}text-amber-600{% else %}text-red-500{% endif %}">
+                  {{ acc.days_left }}
+                </span>
+              {% else %}
+                <span class="text-gray-400">—</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3 text-center">
+              {% if acc.status == 'available' %}
+                <span class="badge badge-green">Bo'sh</span>
+              {% elif acc.status == 'sold' %}
+                <span class="badge badge-gray">Sotilgan</span>
+              {% elif acc.status == 'reserved' %}
+                <span class="badge badge-yellow">Band</span>
+              {% elif acc.status == 'expired' %}
+                <span class="badge badge-red">Muddati o'tgan</span>
+              {% else %}
+                <span class="badge badge-gray">{{ acc.status | default("") }}</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3 text-gray-500 text-xs">{{ acc.supplier | default("—") }}</td>
+            <td class="px-4 py-3 text-center">
+              <form method="POST" action="/accounts/{{ acc.id }}/delete" class="inline"
+                    onsubmit="return confirm('Akkauntni o\'chirishni tasdiqlaysizmi?')">
+                <input type="hidden" name="next" value="/products/{{ product.id }}">
+                <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium">O'chirish</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="flex flex-col items-center justify-center py-12 text-center">
+      <svg class="w-10 h-10 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+      </svg>
+      <p class="text-gray-500 font-medium">Akkauntlar yo'q</p>
+      <p class="text-gray-400 text-sm mt-1">Yuqoridagi tugmalar orqali akkaunt qo'shing</p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

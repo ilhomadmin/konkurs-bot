@@ -125,27 +125,86 @@ async def admins_update(
 async def admins_change_password(
     request: Request,
     admin_id: int,
-    new_password: str = Form(...),
+    password: str = Form(...),
 ):
+    redirect = require_role(request, ["superadmin", "admin"])
+    if redirect:
+        return redirect
+
+    try:
+        if not password.strip():
+            return RedirectResponse("/admins?error=Parol+bo%27sh", status_code=302)
+
+        password_hash = hash_password(password.strip())
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE admin_roles SET password_hash = ? WHERE telegram_id = ?",
+                (password_hash, admin_id)
+            )
+            await db.commit()
+        return RedirectResponse("/admins?success=Parol+o%27zgartirildi", status_code=302)
+    except Exception:
+        logger.exception("Admin paroli o'zgartirishda xato")
+        return RedirectResponse("/admins?error=Xato", status_code=302)
+
+
+@router.post("/{admin_id}/role")
+async def admins_change_role(
+    request: Request,
+    admin_id: int,
+    role: str = Form(...),
+):
+    redirect = require_role(request, ["superadmin", "admin"])
+    if redirect:
+        return redirect
+
+    try:
+        role = role if role in ROLES else "operator"
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE admin_roles SET role = ? WHERE telegram_id = ?",
+                (role, admin_id)
+            )
+            await db.commit()
+        return RedirectResponse("/admins?success=Rol+o%27zgartirildi", status_code=302)
+    except Exception:
+        logger.exception("Admin roli o'zgartirishda xato")
+        return RedirectResponse("/admins?error=Xato", status_code=302)
+
+
+@router.post("/{admin_id}/toggle")
+async def admins_toggle(request: Request, admin_id: int):
+    redirect = require_role(request, ["superadmin", "admin"])
+    if redirect:
+        return redirect
+
+    try:
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE admin_roles SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE telegram_id = ?",
+                (admin_id,)
+            )
+            await db.commit()
+        return RedirectResponse("/admins?success=Holat+o%27zgartirildi", status_code=302)
+    except Exception:
+        logger.exception("Admin toggle xato")
+        return RedirectResponse("/admins?error=Xato", status_code=302)
+
+
+@router.post("/{admin_id}/delete")
+async def admins_delete(request: Request, admin_id: int):
     redirect = require_role(request, ["superadmin"])
     if redirect:
         return redirect
 
     try:
-        if not new_password.strip():
-            return RedirectResponse("/admins?error=empty_password", status_code=302)
-
-        password_hash = hash_password(new_password.strip())
         async with get_db() as db:
-            await db.execute(
-                "UPDATE admin_roles SET password_hash = ? WHERE id = ?",
-                (password_hash, admin_id)
-            )
+            await db.execute("DELETE FROM admin_roles WHERE telegram_id = ?", (admin_id,))
             await db.commit()
-        return RedirectResponse("/admins?success=password_changed", status_code=302)
+        return RedirectResponse("/admins?success=O%27chirildi", status_code=302)
     except Exception:
-        logger.exception("Admin paroli o'zgartirishda xato")
-        return RedirectResponse("/admins?error=1", status_code=302)
+        logger.exception("Admin o'chirishda xato")
+        return RedirectResponse("/admins?error=Xato", status_code=302)
 
 
 @router.post("/{admin_id}/deactivate")

@@ -1,90 +1,116 @@
 {% extends "base.html" %}
-{% block title %}{% if product | default(none) %}Tahrirlash: {{ product.name_uz | default("") }}{% else %}Yangi obuna{% endif %} — IDROK.AI{% endblock %}
+{% set active_page = "products" %}
+{% block title %}{% if product %}Tahrirlash: {{ product.name_uz | default("") }}{% else %}Yangi mahsulot{% endif %} — IDROK.AI Admin{% endblock %}
+
 {% block content %}
-<div class="flex items-center justify-between mb-6">
-  <h1 class="text-xl font-bold text-gray-900">
-    {% if product | default(none) %}Tahrirlash: {{ product.name_uz | default("") }}{% else %}Yangi obuna{% endif %}
-  </h1>
-  <a href="/products" class="btn-secondary">Orqaga</a>
-</div>
-
-<div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 max-w-2xl">
-  <form method="post" action="{% if product | default(none) %}/products/{{ product.id | default('') }}{% else %}/products/add{% endif %}">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-      <div>
-        <label class="label">Nomi (UZ)</label>
-        <input type="text" name="name_uz" value="{{ product.name_uz | default('') if product else '' }}" class="input-field" required>
-      </div>
-      <div>
-        <label class="label">Nomi (RU)</label>
-        <input type="text" name="name_ru" value="{{ product.name_ru | default('') if product else '' }}" class="input-field">
-      </div>
-
-      <div>
-        <label class="label">Narx (so'm)</label>
-        <input type="number" name="price" value="{{ product.price | default(0) if product else '' }}" class="input-field" min="0" step="1000">
-      </div>
-      <div>
-        <label class="label">Tannarx</label>
-        <input type="number" name="cost_price" value="{{ product.cost_price | default(0) if product else '' }}" class="input-field" min="0" step="1000">
-      </div>
-
-      <div>
-        <label class="label">Muddat matni (UZ)</label>
-        <input type="text" name="duration_text_uz" value="{{ product.duration_text_uz | default('') if product else '' }}" class="input-field" placeholder="1 oylik">
-      </div>
-      <div>
-        <label class="label">Muddat matni (RU)</label>
-        <input type="text" name="duration_text_ru" value="{{ product.duration_text_ru | default('') if product else '' }}" class="input-field" placeholder="1 месяц">
-      </div>
-
-      <div>
-        <label class="label">Kategoriya</label>
-        <select name="category_id" class="input-field">
-          <option value="">— Tanlang —</option>
-          {% for cat in categories | default([]) %}
-          <option value="{{ cat.id | default('') }}"
-            {% if product and product.category_id | default('') == cat.id | default('') %}selected{% endif %}>
-            {{ cat.name_uz | default("") }}
-          </option>
-          {% endfor %}
-        </select>
-      </div>
-      <div>
-        <label class="label">Tartib raqami</label>
-        <input type="number" name="sort_order" value="{{ product.sort_order | default(0) if product else 0 }}" class="input-field" min="0">
-      </div>
-
-      <div class="md:col-span-2">
-        <label class="label">Tavsif (UZ)</label>
-        <textarea name="description_uz" rows="3" class="input-field">{{ product.description_uz | default('') if product else '' }}</textarea>
-      </div>
-      <div class="md:col-span-2">
-        <label class="label">Tavsif (RU)</label>
-        <textarea name="description_ru" rows="3" class="input-field">{{ product.description_ru | default('') if product else '' }}</textarea>
-      </div>
-
-      <div>
-        <label class="label">Kafolat kunlari</label>
-        <input type="number" name="warranty_days" value="{{ product.warranty_days | default(0) if product else 0 }}" class="input-field" min="0">
-      </div>
-      <div class="flex flex-col gap-3 justify-center">
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" name="has_warranty" value="1" {% if product and product.has_warranty | default(false) %}checked{% endif %} class="w-4 h-4 rounded text-indigo-600">
-          <span class="text-sm text-gray-700">Kafolat mavjud</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" name="is_active" value="1" {% if not product or product.is_active | default(true) %}checked{% endif %} class="w-4 h-4 rounded text-indigo-600">
-          <span class="text-sm text-gray-700">Faol</span>
-        </label>
-      </div>
+<div class="space-y-6" x-data="{ hasWarranty: {{ 'true' if product and product.has_warranty else 'false' }} }">
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-semibold text-gray-900">
+        {% if product %}Mahsulotni tahrirlash{% else %}Yangi mahsulot{% endif %}
+      </h1>
     </div>
+    <a href="{% if product %}/products/{{ product.id }}{% else %}/products{% endif %}" class="btn-secondary">Orqaga</a>
+  </div>
 
-    <div class="flex gap-3 mt-6 pt-4 border-t border-gray-100">
-      <button type="submit" class="btn-primary">Saqlash</button>
-      <a href="/products" class="btn-secondary">Bekor qilish</a>
-    </div>
-  </form>
+  <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 max-w-2xl">
+    <form method="post" action="{% if product %}/products/edit/{{ product.id }}{% else %}/products/add{% endif %}">
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Nom -->
+        <div>
+          <label class="label">Nom (UZ) <span class="text-red-500">*</span></label>
+          <input type="text" name="name_uz" value="{{ product.name_uz | default('') if product else '' }}"
+                 class="input-field" required placeholder="Mahsulot nomi">
+        </div>
+        <div>
+          <label class="label">Nom (RU)</label>
+          <input type="text" name="name_ru" value="{{ product.name_ru | default('') if product else '' }}"
+                 class="input-field" placeholder="Название продукта">
+        </div>
+
+        <!-- Narx -->
+        <div>
+          <label class="label">Narx (so'm) <span class="text-red-500">*</span></label>
+          <input type="number" name="price" value="{{ product.price | default(0) if product else 0 }}"
+                 class="input-field" min="0" step="100" required>
+        </div>
+        <div>
+          <label class="label">Tannarx (so'm)</label>
+          <input type="number" name="cost_price" value="{{ product.cost_price | default(0) if product else 0 }}"
+                 class="input-field" min="0" step="100">
+        </div>
+
+        <!-- Tavsif -->
+        <div class="md:col-span-2">
+          <label class="label">Tavsif (UZ)</label>
+          <textarea name="description_uz" rows="3" class="input-field"
+                    placeholder="Mahsulot haqida qisqacha">{{ product.description_uz | default('') if product else '' }}</textarea>
+        </div>
+        <div class="md:col-span-2">
+          <label class="label">Tavsif (RU)</label>
+          <textarea name="description_ru" rows="3" class="input-field"
+                    placeholder="Краткое описание">{{ product.description_ru | default('') if product else '' }}</textarea>
+        </div>
+
+        <!-- Kafolat toggle -->
+        <div class="md:col-span-2">
+          <label class="flex items-center gap-3 cursor-pointer select-none">
+            <div class="relative">
+              <input type="checkbox" name="has_warranty" value="1"
+                     @change="hasWarranty = $event.target.checked"
+                     {% if product and product.has_warranty %}checked{% endif %}
+                     class="sr-only peer">
+              <div class="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer
+                          peer-checked:after:translate-x-full peer-checked:after:border-white
+                          after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                          after:bg-white after:border-gray-300 after:border after:rounded-full
+                          after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+            </div>
+            <span class="text-sm font-medium text-gray-700">Kafolat mavjud</span>
+          </label>
+        </div>
+
+        <div x-show="hasWarranty" x-cloak>
+          <label class="label">Kafolat kunlari</label>
+          <input type="number" name="warranty_days"
+                 value="{{ product.warranty_days | default(0) if product else 0 }}"
+                 class="input-field" min="1" placeholder="30">
+        </div>
+
+        <!-- Video keyword -->
+        <div>
+          <label class="label">Video keyword</label>
+          <input type="text" name="video_keyword"
+                 value="{{ product.video_keyword | default('') if product else '' }}"
+                 class="input-field" placeholder="chatgpt1oy">
+          <p class="text-xs text-gray-400 mt-1">Instruksiya video uchun kalit so'z</p>
+        </div>
+
+        <!-- Status -->
+        <div class="flex items-center">
+          <label class="flex items-center gap-3 cursor-pointer select-none">
+            <div class="relative">
+              <input type="checkbox" name="is_active" value="1"
+                     {% if not product or product.is_active | default(true) %}checked{% endif %}
+                     class="sr-only peer">
+              <div class="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer
+                          peer-checked:after:translate-x-full peer-checked:after:border-white
+                          after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                          after:bg-white after:border-gray-300 after:border after:rounded-full
+                          after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+            </div>
+            <span class="text-sm font-medium text-gray-700">Faol</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="flex gap-3 mt-6 pt-4 border-t border-gray-100">
+        <button type="submit" class="btn-primary">Saqlash</button>
+        <a href="{% if product %}/products/{{ product.id }}{% else %}/products{% endif %}" class="btn-secondary">Bekor qilish</a>
+      </div>
+    </form>
+  </div>
 </div>
 {% endblock %}
