@@ -91,15 +91,34 @@
   </div>
   {% endmacro %}
 
+  <!-- ==================== TO'LOV ==================== -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    {{ section_header('payment', 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z', "To'lov") }}
+    <div x-show="openSection === 'payment'" x-cloak>
+      {{ number_row("To'lov timeout", 'payment_timeout_minutes', 'daqiqa', 1) }}
+      {{ textarea_row("To'lov yo'riqnomasi (UZ)", 'payment_instruction_uz') }}
+      {{ textarea_row("To'lov yo'riqnomasi (RU)", 'payment_instruction_ru') }}
+    </div>
+  </div>
+
+  <!-- ==================== AUTO-CONFIRM ==================== -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    {{ section_header('auto_confirm', 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', 'Avtomatik tasdiqlash') }}
+    <div x-show="openSection === 'auto_confirm'" x-cloak>
+      {{ toggle_row('Avtomatik tasdiqlash', 'auto_confirm_enabled') }}
+      {{ number_row("Avtomatik tasdiqlash limiti (so'm)", 'auto_confirm_limit', "so'm", 0) }}
+    </div>
+  </div>
+
   <!-- ==================== MARKETING ==================== -->
   <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
     {{ section_header('marketing', 'M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z', 'Marketing') }}
     <div x-show="openSection === 'marketing'" x-cloak>
       {{ toggle_row('VIP tizimi', 'vip_enabled') }}
       {{ toggle_row('Referal tizimi', 'referral_enabled') }}
-      {{ number_row('Referal chegirma', 'referral_discount', '%', 0) }}
-      {{ number_row("Uzaytirish chegirma", 'renewal_discount', '%', 0) }}
-      {{ number_row('Abandoned cart chegirma', 'abandoned_cart_discount', '%', 0) }}
+      {{ number_row('Referal chegirma', 'referral_discount_percent', '%', 0) }}
+      {{ number_row("Uzaytirish chegirma", 'renewal_discount_percent', '%', 0) }}
+      {{ number_row('Abandoned cart chegirma', 'abandoned_cart_discount_percent', '%', 0) }}
       {{ toggle_row('Cross-sell tavsiya', 'cross_sell_enabled') }}
       {{ toggle_row('Avtomatik yetkazish', 'auto_delivery_enabled') }}
     </div>
@@ -109,10 +128,9 @@
   <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
     {{ section_header('timing', 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', "Vaqt sozlamalari") }}
     <div x-show="openSection === 'timing'" x-cloak>
-      {{ number_row("To'lov timeout", 'payment_timeout_minutes', 'daqiqa', 1) }}
-      {{ number_row('Abandoned cart 1', 'abandoned_cart_hours_1', 'soat', 1) }}
-      {{ number_row('Abandoned cart 2', 'abandoned_cart_hours_2', 'soat', 1) }}
-      {{ number_row("Sharh so'rash", 'review_request_days', 'kundan keyin', 1) }}
+      {{ number_row('Abandoned cart 1-eslatma', 'abandoned_cart_first_hours', 'soat', 1) }}
+      {{ number_row('Abandoned cart 2-eslatma', 'abandoned_cart_second_hours', 'soat', 1) }}
+      {{ number_row("Sharh so'rash", 'review_ask_days', 'kundan keyin', 1) }}
     </div>
   </div>
 
@@ -120,13 +138,13 @@
   <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
     {{ section_header('general', 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z', 'Umumiy sozlamalar') }}
     <div x-show="openSection === 'general'" x-cloak>
-      {{ toggle_row('Texnik tanaffus', 'maintenance_mode') }}
+      {{ toggle_row('Texnik tanaffus', 'bot_maintenance_mode') }}
       {{ textarea_row("Tanaffus xabari (UZ)", 'maintenance_message_uz') }}
       {{ textarea_row("Tanaffus xabari (RU)", 'maintenance_message_ru') }}
       {{ number_row("Min buyurtma", 'min_order_amount', "so'm", 0) }}
       {{ number_row("Max savat", 'max_cart_items', 'ta', 1) }}
-      {{ number_row("Dollar kurs", 'usd_rate', "so'm", 1) }}
-      {{ toggle_row("Telefon so'rash", 'require_phone') }}
+      {{ number_row("Dollar kurs", 'currency_rate_usd', "so'm", 1) }}
+      {{ toggle_row("Telefon so'rash", 'ask_phone_on_register') }}
     </div>
   </div>
 
@@ -134,8 +152,8 @@
   <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
     {{ section_header('inventory', 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4', 'Ombor') }}
     <div x-show="openSection === 'inventory'" x-cloak>
-      {{ toggle_row('Stok ogohlantirish', 'low_stock_alert') }}
-      {{ number_row('Stok chegara', 'low_stock_threshold', 'ta', 1) }}
+      {{ toggle_row('Stok ogohlantirish', 'stock_alert_enabled') }}
+      {{ number_row('Stok chegara', 'stock_alert_threshold', 'ta', 1) }}
     </div>
   </div>
 
@@ -157,27 +175,29 @@
     {{ section_header('onboarding', 'M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z', 'Onboarding') }}
     <div x-show="openSection === 'onboarding'" x-cloak>
       {{ toggle_row('Onboarding yoqilgan', 'onboarding_enabled') }}
-      {{ textarea_row('Xabar 1 (UZ)', 'onboarding_msg1_uz') }}
-      {{ textarea_row('Xabar 1 (RU)', 'onboarding_msg1_ru') }}
-      {{ textarea_row('Xabar 2 (UZ)', 'onboarding_msg2_uz') }}
-      {{ textarea_row('Xabar 2 (RU)', 'onboarding_msg2_ru') }}
-      {{ textarea_row('Xabar 3 (UZ)', 'onboarding_msg3_uz') }}
-      {{ textarea_row('Xabar 3 (RU)', 'onboarding_msg3_ru') }}
+      {{ textarea_row('Onboarding xabarlari (JSON)', 'onboarding_messages') }}
     </div>
   </div>
 
   <!-- ==================== QOLGAN SOZLAMALAR ==================== -->
   {% set shown_keys = [
-    'vip_enabled','referral_enabled','referral_discount','renewal_discount',
-    'abandoned_cart_discount','cross_sell_enabled','auto_delivery_enabled',
-    'payment_timeout_minutes','abandoned_cart_hours_1','abandoned_cart_hours_2',
-    'review_request_days','maintenance_mode','maintenance_message_uz','maintenance_message_ru',
-    'min_order_amount','max_cart_items','usd_rate','require_phone',
-    'low_stock_alert','low_stock_threshold',
+    'payment_timeout_minutes','payment_instruction_uz','payment_instruction_ru',
+    'auto_confirm_enabled','auto_confirm_limit',
+    'vip_enabled','referral_enabled','referral_discount_percent','renewal_discount_percent',
+    'abandoned_cart_discount_percent','cross_sell_enabled','auto_delivery_enabled',
+    'abandoned_cart_first_hours','abandoned_cart_second_hours',
+    'review_ask_days','bot_maintenance_mode','maintenance_message_uz','maintenance_message_ru',
+    'min_order_amount','max_cart_items','currency_rate_usd','ask_phone_on_register',
+    'stock_alert_enabled','stock_alert_threshold',
     'welcome_message_uz','welcome_message_ru','bot_description_uz','bot_description_ru',
-    'error_message_uz','error_message_ru',
-    'onboarding_enabled','onboarding_msg1_uz','onboarding_msg1_ru',
-    'onboarding_msg2_uz','onboarding_msg2_ru','onboarding_msg3_uz','onboarding_msg3_ru'
+    'error_message_uz','error_message_ru','order_confirmed_message_uz','order_confirmed_message_ru',
+    'onboarding_enabled','onboarding_messages','faq_items',
+    'smart_timing_start','smart_timing_end','expiry_reminder_days','cross_sell_delay_days',
+    'payment_group_id','payment_methods','bot_language_mode',
+    'payme_merchant_id','payme_secret_key','click_merchant_id','click_secret_key','click_service_id',
+    'menu_products_uz','menu_products_ru','menu_cart_uz','menu_cart_ru',
+    'menu_orders_uz','menu_orders_ru','menu_bundles_uz','menu_bundles_ru',
+    'menu_profile_uz','menu_profile_ru','menu_help_uz','menu_help_ru'
   ] %}
   {% set other_settings = settings | default([]) | selectattr('key', 'undefined') | list %}
   {% set other = [] %}

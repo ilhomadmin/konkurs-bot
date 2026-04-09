@@ -22,6 +22,7 @@ from web.routes import dashboard, products, categories, accounts, orders, replac
 from web.routes import finance, promos, flash_sales, bundles, reviews
 from web.routes import broadcast, admins, settings as settings_routes, direct_sale
 from web.routes import profile as profile_routes
+from web.routes import payment_api
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -106,3 +107,4 @@ app.include_router(admins.router, prefix="/admins")
 app.include_router(settings_routes.router, prefix="/settings")
 app.include_router(direct_sale.router, prefix="/direct-sale")
 app.include_router(profile_routes.router, prefix="/profile")
+app.include_router(payment_api.router, prefix="/payment")

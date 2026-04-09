@@ -7,6 +7,14 @@ from aiogram import Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
+
+async def get_setting_or_empty(key: str) -> str:
+    try:
+        from bot.utils.settings import get_setting
+        return await get_setting(key, "")
+    except Exception:
+        return ""
+
 from bot.db.models import (
     get_user, cart_get, cart_clear,
     create_order, add_order_item,
@@ -122,6 +130,41 @@ async def create_order_handler(
         if promo_id:
             await increment_promo_usage(promo_id)
 
+        # PHASE 4: Auto-confirmation tekshirish
+        try:
+            from bot.utils.settings import get_setting_bool, get_setting_int  # noqa: F401
+            auto_enabled = await get_setting_bool("auto_confirm_enabled", False)
+            auto_limit = await get_setting_int("auto_confirm_limit", 50000)
+            if auto_enabled and final_amount <= auto_limit:
+                # Avtomatik tasdiqlash
+                from bot.db.models import (
+                    confirm_reserved, increment_purchase_count,
+                    increment_user_purchases, check_and_upgrade_vip,
+                    get_order_items
+                )
+                from bot.handlers.payment import build_account_delivery_text
+
+                sold_accounts = await confirm_reserved(order_id, user_telegram_id)
+
+                fresh_items = await get_order_items(order_id)
+                for item in fresh_items:
+                    await increment_purchase_count(item["product_id"])
+
+                await increment_user_purchases(user_telegram_id, final_amount)
+                await check_and_upgrade_vip(user_telegram_id)
+                await update_order_status(order_id, "confirmed")
+
+                accounts_text = build_account_delivery_text(fresh_items, lang)
+                await cart_clear(user_telegram_id)
+                await state.clear()
+
+                await message.answer("✅ To'lovingiz avtomatik tasdiqlandi!\n\n" + t("order_delivered", lang,
+                                     order_id=order_id, accounts_text=accounts_text),
+                                     parse_mode="HTML")
+                return
+        except Exception as e:
+            logger.warning(f"Auto-confirm check error: {e}")
+
         # To'lov ma'lumotlarini settings dan olish
         try:
             from bot.utils.settings import get_setting
@@ -137,12 +180,40 @@ async def create_order_handler(
         except Exception:
             payment_info = ""
 
+        # Payme/Click URL lari
+        payme_id = await get_setting_or_empty("payme_merchant_id")
+        click_merchant_id = await get_setting_or_empty("click_merchant_id")
+        click_service_id = await get_setting_or_empty("click_service_id")
+
+        payment_kb_rows = []
+        if payme_id:
+            import base64 as b64
+            amount_tiyin = final_amount * 100
+            payme_params = f"m={payme_id};ac.order_id={order_id};a={amount_tiyin}"
+            payme_encoded = b64.b64encode(payme_params.encode()).decode()
+            payme_url = f"https://checkout.paycom.uz/{payme_encoded}"
+            payment_kb_rows.append([
+                InlineKeyboardButton(text="💳 Payme orqali to'lash", url=payme_url)
+            ])
+        if click_merchant_id and click_service_id:
+            click_url = (
+                f"https://my.click.uz/services/pay?service_id={click_service_id}"
+                f"&merchant_id={click_merchant_id}&amount={final_amount}"
+                f"&transaction_param={order_id}&return_url="
+            )
+            payment_kb_rows.append([
+                InlineKeyboardButton(text="💳 Click orqali to'lash", url=click_url)
+            ])
+
+        payment_kb = InlineKeyboardMarkup(inline_keyboard=payment_kb_rows) if payment_kb_rows else None
+
         # Progress bar xabarini yuborish
         progress_msg = await message.answer(
             t("order_created_progress", lang,
               order_id=order_id,
               amount=final_amount,
-              payment_info=payment_info)
+              payment_info=payment_info),
+            reply_markup=payment_kb
         )
 
         # progress_message_id ni saqlash

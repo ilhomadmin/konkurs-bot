@@ -67,7 +67,7 @@
     <!-- Table -->
     <div class="table-container">
         {% if promos %}
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto hidden md:block">
             <table class="w-full text-sm">
                 <thead>
                     <tr class="border-b border-gray-100 bg-gray-50">
@@ -125,6 +125,31 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+        <!-- Mobile cards -->
+        <div class="md:hidden divide-y divide-gray-100">
+            {% for promo in promos %}
+            <div class="p-4 space-y-1.5">
+                <div class="flex items-center justify-between gap-2">
+                    <span class="font-mono font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded text-sm">{{ promo.code }}</span>
+                    {% if promo.is_active %}<span class="badge badge-green">Faol</span>{% else %}<span class="badge badge-red">Nofaol</span>{% endif %}
+                </div>
+                <div class="text-sm text-gray-700">
+                    {% if promo.discount_type == 'percent' %}{{ promo.discount_value }}% chegirma
+                    {% else %}{{ "{:,}".format(promo.discount_value|int) }} so'm chegirma{% endif %}
+                    · Foydalanilgan: {{ promo.used_count or 0 }}{% if promo.max_uses %}/{{ promo.max_uses }}{% endif %}
+                </div>
+                <div class="flex gap-2">
+                    <form method="POST" action="/promos/{{ promo.id }}/toggle" class="inline">
+                        <button type="submit" class="btn-secondary btn-sm text-xs">{{ "O'chir" if promo.is_active else "Yoq" }}</button>
+                    </form>
+                    <form method="POST" action="/promos/{{ promo.id }}/delete" class="inline"
+                          onsubmit="return confirm('O\'chirilsinmi?')">
+                        <button type="submit" class="btn-danger btn-sm text-xs">O'chirish</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
         </div>
         {% else %}
         <div class="flex flex-col items-center justify-center py-16 text-center">
